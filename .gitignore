@@ -1,0 +1,38 @@
+# dependencies
+node_modules
+
+# build output
+dist
+out
+*.tgz
+
+# coverage
+coverage
+*.lcov
+
+# logs
+logs
+*.log
+npm-debug.log*
+
+# env
+.env
+.env.local
+.env.*.local
+
+# caches
+.cache
+*.tsbuildinfo
+
+# editor
+.DS_Store
+.vscode
+.idea
+
+# test artifacts
+/tmp
+tests/.tmp
+
+# internal design + planning docs (kept locally, not part of the published package)
+docs/specs/
+docs/plans/
