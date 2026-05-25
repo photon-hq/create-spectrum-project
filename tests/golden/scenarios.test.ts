@@ -18,9 +18,12 @@ const SCENARIOS: Scenario[] = [
   { name: "terminal-only", providers: ["terminal"] },
   { name: "imessage-cloud", providers: ["imessage"], imessageMode: "cloud" },
   { name: "imessage-local", providers: ["imessage"], imessageMode: "local" },
-  // Added in Task 5:
-  // { name: "whatsapp-only", providers: ["whatsapp"] },
-  // { name: "all-production", providers: ["imessage", "whatsapp"], imessageMode: "cloud" },
+  { name: "whatsapp-only", providers: ["whatsapp"] },
+  {
+    name: "all-production",
+    providers: ["imessage", "whatsapp"],
+    imessageMode: "cloud",
+  },
 ];
 
 describe("golden scenarios", () => {

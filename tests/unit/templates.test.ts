@@ -112,6 +112,66 @@ describe("assembleProviders — imessage local", () => {
   });
 });
 
+describe("assembleProviders — whatsapp only", () => {
+  const r = assembleProviders(["whatsapp"], "cloud");
+
+  test("imports whatsappBusiness from whatsapp-business path", () => {
+    expect(r.importsBlock).toContain(
+      'import { whatsappBusiness } from "spectrum-ts/providers/whatsapp-business";'
+    );
+  });
+
+  test("config call wires the three env vars", () => {
+    expect(r.spectrumConfigBody).toContain("accessToken: process.env.WA_TOKEN!");
+    expect(r.spectrumConfigBody).toContain(
+      "phoneNumberId: process.env.WA_NUMBER_ID!"
+    );
+    expect(r.spectrumConfigBody).toContain("appSecret: process.env.WA_SECRET!");
+  });
+
+  test("no top-level Spectrum env vars (WhatsApp owns its own creds)", () => {
+    expect(r.topLevelEnvVars).toEqual([]);
+  });
+
+  test("provider env vars are WA_TOKEN / WA_NUMBER_ID / WA_SECRET", () => {
+    expect(r.providerEnvVars).toEqual(["WA_TOKEN", "WA_NUMBER_ID", "WA_SECRET"]);
+  });
+
+  test("needsEnvFile is true", () => {
+    expect(r.needsEnvFile).toBe(true);
+  });
+
+  test("config body has no projectId or projectSecret", () => {
+    expect(r.spectrumConfigBody).not.toContain("projectId");
+    expect(r.spectrumConfigBody).not.toContain("projectSecret");
+  });
+});
+
+describe("assembleProviders — iMessage cloud + WhatsApp", () => {
+  const r = assembleProviders(["imessage", "whatsapp"], "cloud");
+
+  test("imports both providers", () => {
+    expect(r.importsBlock).toContain("providers/imessage");
+    expect(r.importsBlock).toContain("providers/whatsapp-business");
+  });
+
+  test("emission order is iMessage before WhatsApp regardless of input order", () => {
+    const reversed = assembleProviders(["whatsapp", "imessage"], "cloud");
+    expect(reversed.importsBlock).toBe(r.importsBlock);
+    expect(reversed.spectrumConfigBody).toBe(r.spectrumConfigBody);
+  });
+
+  test("env file contains both top-level and provider vars", () => {
+    expect(r.topLevelEnvVars).toEqual(["PROJECT_ID", "PROJECT_SECRET"]);
+    expect(r.providerEnvVars).toEqual(["WA_TOKEN", "WA_NUMBER_ID", "WA_SECRET"]);
+  });
+
+  test("config body has both projectId and the whatsapp credential wiring", () => {
+    expect(r.spectrumConfigBody).toContain("projectId: process.env.PROJECT_ID!");
+    expect(r.spectrumConfigBody).toContain("accessToken: process.env.WA_TOKEN!");
+  });
+});
+
 describe("assembleProviders — empty input rejected", () => {
   test("throws on empty providers list", () => {
     expect(() => assembleProviders([], "cloud")).toThrow();
