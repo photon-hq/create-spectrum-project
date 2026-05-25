@@ -18,7 +18,7 @@ describe("substitute", () => {
 });
 
 describe("assembleProviders — terminal only", () => {
-  const r = assembleProviders(["terminal"], "cloud");
+  const r = assembleProviders(["terminal"]);
 
   test("imports Spectrum + terminal only", () => {
     expect(r.importsBlock).toBe(
@@ -43,14 +43,10 @@ describe("assembleProviders — terminal only", () => {
   test("human label is `terminal`", () => {
     expect(r.providersHuman).toBe("terminal");
   });
-
-  test("hasImessageLocal is false", () => {
-    expect(r.hasImessageLocal).toBe(false);
-  });
 });
 
-describe("assembleProviders — imessage cloud", () => {
-  const r = assembleProviders(["imessage"], "cloud");
+describe("assembleProviders — imessage", () => {
+  const r = assembleProviders(["imessage"]);
 
   test("imports iMessage", () => {
     expect(r.importsBlock).toContain('from "spectrum-ts/providers/imessage"');
@@ -62,13 +58,15 @@ describe("assembleProviders — imessage cloud", () => {
   });
 
   test("config body wires projectId and projectSecret", () => {
-    expect(r.spectrumConfigBody).toContain("projectId: process.env.PROJECT_ID!");
+    expect(r.spectrumConfigBody).toContain(
+      "projectId: process.env.PROJECT_ID!"
+    );
     expect(r.spectrumConfigBody).toContain(
       "projectSecret: process.env.PROJECT_SECRET!"
     );
   });
 
-  test("provider config takes no args in cloud mode", () => {
+  test("provider config takes no args", () => {
     expect(r.spectrumConfigBody).toContain("imessage.config(),");
     expect(r.spectrumConfigBody).not.toContain("imessage.config({");
   });
@@ -77,43 +75,13 @@ describe("assembleProviders — imessage cloud", () => {
     expect(r.needsEnvFile).toBe(true);
   });
 
-  test("hasImessageLocal is false", () => {
-    expect(r.hasImessageLocal).toBe(false);
-  });
-});
-
-describe("assembleProviders — imessage local", () => {
-  const r = assembleProviders(["imessage"], "local");
-
-  test("provider config uses { local: true }", () => {
-    expect(r.spectrumConfigBody).toContain("imessage.config({ local: true })");
-  });
-
-  test("no env vars (local doesn't use PROJECT_ID/SECRET)", () => {
-    expect(r.topLevelEnvVars).toEqual([]);
-    expect(r.providerEnvVars).toEqual([]);
-    expect(r.needsEnvFile).toBe(false);
-  });
-
-  test("config body has no projectId or projectSecret", () => {
-    expect(r.spectrumConfigBody).not.toContain("projectId");
-    expect(r.spectrumConfigBody).not.toContain("projectSecret");
-  });
-
-  test("hasImessageLocal is true", () => {
-    expect(r.hasImessageLocal).toBe(true);
-  });
-
-  test("warning block is embedded in the provider section", () => {
-    expect(r.spectrumConfigBody).toContain(
-      "⚠ Local iMessage mode requirements:"
-    );
-    expect(r.spectrumConfigBody).toContain("Full Disk Access");
+  test("human label is `iMessage`", () => {
+    expect(r.providersHuman).toBe("iMessage");
   });
 });
 
 describe("assembleProviders — whatsapp only", () => {
-  const r = assembleProviders(["whatsapp"], "cloud");
+  const r = assembleProviders(["whatsapp"]);
 
   test("imports whatsappBusiness from whatsapp-business path", () => {
     expect(r.importsBlock).toContain(
@@ -122,7 +90,9 @@ describe("assembleProviders — whatsapp only", () => {
   });
 
   test("config call wires the three env vars", () => {
-    expect(r.spectrumConfigBody).toContain("accessToken: process.env.WA_TOKEN!");
+    expect(r.spectrumConfigBody).toContain(
+      "accessToken: process.env.WA_TOKEN!"
+    );
     expect(r.spectrumConfigBody).toContain(
       "phoneNumberId: process.env.WA_NUMBER_ID!"
     );
@@ -134,7 +104,11 @@ describe("assembleProviders — whatsapp only", () => {
   });
 
   test("provider env vars are WA_TOKEN / WA_NUMBER_ID / WA_SECRET", () => {
-    expect(r.providerEnvVars).toEqual(["WA_TOKEN", "WA_NUMBER_ID", "WA_SECRET"]);
+    expect(r.providerEnvVars).toEqual([
+      "WA_TOKEN",
+      "WA_NUMBER_ID",
+      "WA_SECRET",
+    ]);
   });
 
   test("needsEnvFile is true", () => {
@@ -147,8 +121,8 @@ describe("assembleProviders — whatsapp only", () => {
   });
 });
 
-describe("assembleProviders — iMessage cloud + WhatsApp", () => {
-  const r = assembleProviders(["imessage", "whatsapp"], "cloud");
+describe("assembleProviders — iMessage + WhatsApp", () => {
+  const r = assembleProviders(["imessage", "whatsapp"]);
 
   test("imports both providers", () => {
     expect(r.importsBlock).toContain("providers/imessage");
@@ -156,24 +130,32 @@ describe("assembleProviders — iMessage cloud + WhatsApp", () => {
   });
 
   test("emission order is iMessage before WhatsApp regardless of input order", () => {
-    const reversed = assembleProviders(["whatsapp", "imessage"], "cloud");
+    const reversed = assembleProviders(["whatsapp", "imessage"]);
     expect(reversed.importsBlock).toBe(r.importsBlock);
     expect(reversed.spectrumConfigBody).toBe(r.spectrumConfigBody);
   });
 
   test("env file contains both top-level and provider vars", () => {
     expect(r.topLevelEnvVars).toEqual(["PROJECT_ID", "PROJECT_SECRET"]);
-    expect(r.providerEnvVars).toEqual(["WA_TOKEN", "WA_NUMBER_ID", "WA_SECRET"]);
+    expect(r.providerEnvVars).toEqual([
+      "WA_TOKEN",
+      "WA_NUMBER_ID",
+      "WA_SECRET",
+    ]);
   });
 
   test("config body has both projectId and the whatsapp credential wiring", () => {
-    expect(r.spectrumConfigBody).toContain("projectId: process.env.PROJECT_ID!");
-    expect(r.spectrumConfigBody).toContain("accessToken: process.env.WA_TOKEN!");
+    expect(r.spectrumConfigBody).toContain(
+      "projectId: process.env.PROJECT_ID!"
+    );
+    expect(r.spectrumConfigBody).toContain(
+      "accessToken: process.env.WA_TOKEN!"
+    );
   });
 });
 
 describe("assembleProviders — empty input rejected", () => {
   test("throws on empty providers list", () => {
-    expect(() => assembleProviders([], "cloud")).toThrow();
+    expect(() => assembleProviders([])).toThrow();
   });
 });

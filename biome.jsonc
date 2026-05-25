@@ -2,7 +2,7 @@
   "$schema": "./node_modules/@biomejs/biome/configuration_schema.json",
   "extends": ["ultracite/biome/core"],
   "files": {
-    "includes": ["!!bun.lock", "!templates", "!dist"]
+    "includes": ["!!bun.lock", "!templates", "!dist", "!tests/golden"]
   },
   "javascript": {
     "globals": ["Bun"]

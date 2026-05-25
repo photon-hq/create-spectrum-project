@@ -28,5 +28,10 @@
     }
   },
   "include": ["src/**/*", "tests/**/*"],
-  "exclude": ["templates/**/*", "dist/**/*", "node_modules"]
+  "exclude": [
+    "templates/**/*",
+    "tests/golden/**/*",
+    "dist/**/*",
+    "node_modules"
+  ]
 }

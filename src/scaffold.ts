@@ -22,12 +22,10 @@ import {
 } from "./templates.ts";
 
 export type Provider = "terminal" | "imessage" | "whatsapp";
-export type ImessageMode = "cloud" | "local";
 
 export interface ScaffoldOptions {
   credentials?: { projectId: string; projectSecret: string };
   git?: boolean;
-  imessageMode?: ImessageMode;
   install?: boolean;
   logger?: ScaffoldLogger;
   name?: string;
@@ -38,6 +36,7 @@ export interface ScaffoldOptions {
 }
 
 export interface ScaffoldResult {
+  needsEnvFile: boolean;
   spectrumTsVersion: string;
   steps: { copied: true; installed: boolean; gitInitialized: boolean };
   targetDir: string;
@@ -79,7 +78,6 @@ export async function scaffold(
   if (options.providers.length === 0) {
     throw new Error("scaffold: providers must include at least one entry");
   }
-  const imessageMode: ImessageMode = options.imessageMode ?? "cloud";
 
   const targetDir = isAbsolute(options.targetDir)
     ? options.targetDir
@@ -97,7 +95,7 @@ export async function scaffold(
     logger
   );
 
-  const assembly = assembleProviders(options.providers, imessageMode);
+  const assembly = assembleProviders(options.providers);
 
   const tokens = buildTokens({ name, spectrumTsVersion, assembly, pm });
 
@@ -149,6 +147,7 @@ export async function scaffold(
   return {
     targetDir,
     spectrumTsVersion,
+    needsEnvFile: assembly.needsEnvFile,
     steps: { copied: true, installed, gitInitialized },
   };
 }
@@ -240,9 +239,6 @@ function buildTokens(args: {
       assembly.topLevelEnvVars,
       assembly.providerEnvVars
     ),
-    imessageLocalHintBlock: assembly.hasImessageLocal
-      ? buildImessageLocalHint()
-      : "",
   };
 }
 
@@ -365,17 +361,4 @@ async function tryGitInit(
     );
     return false;
   }
-}
-
-function buildImessageLocalHint(): string {
-  return `${[
-    "## Local iMessage mode",
-    "",
-    "Requires:",
-    "",
-    "- macOS only (reads `~/Library/Messages/chat.db` directly)",
-    "- Your terminal needs **Full Disk Access**: System Settings → Privacy & Security → Full Disk Access",
-    "- Reduced features: text + attachments only (no reactions, typing indicators, threaded replies, group ops)",
-    "",
-  ].join("\n")}\n`;
 }

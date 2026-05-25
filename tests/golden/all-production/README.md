@@ -1,6 +1,6 @@
 # all-production
 
-A [Spectrum](https://photon.codes/docs/spectrum-ts) project. Wired with: iMessage (cloud), WhatsApp Business.
+A [Spectrum](https://photon.codes/docs/spectrum-ts) project. Wired with: iMessage, WhatsApp Business.
 
 ## Environment
 

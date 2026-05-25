@@ -1,6 +1,6 @@
-# imessage-cloud
+# imessage
 
-A [Spectrum](https://photon.codes/docs/spectrum-ts) project. Wired with: iMessage (cloud).
+A [Spectrum](https://photon.codes/docs/spectrum-ts) project. Wired with: iMessage.
 
 ## Environment
 

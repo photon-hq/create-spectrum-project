@@ -1,10 +1,9 @@
 import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
-import type { ImessageMode, Provider } from "./scaffold.ts";
+import type { Provider } from "./scaffold.ts";
 
 export interface ProviderAssembly {
-  hasImessageLocal: boolean;
   importsBlock: string;
   needsEnvFile: boolean;
   providerEnvVars: string[];
@@ -13,19 +12,7 @@ export interface ProviderAssembly {
   topLevelEnvVars: string[];
 }
 
-const IMESSAGE_LOCAL_WARNING = [
-  "// ⚠ Local iMessage mode requirements:",
-  "//    • macOS only (reads ~/Library/Messages/chat.db directly)",
-  "//    • Your terminal needs Full Disk Access:",
-  "//      System Settings → Privacy & Security → Full Disk Access",
-  "//    • Reduced features: text + attachments only",
-  "//      (no reactions, typing indicators, threaded replies, group ops)",
-].join("\n");
-
-export function assembleProviders(
-  providers: Provider[],
-  imessageMode: ImessageMode
-): ProviderAssembly {
+export function assembleProviders(providers: Provider[]): ProviderAssembly {
   if (providers.length === 0) {
     throw new Error("assembleProviders: at least one provider required");
   }
@@ -36,10 +23,7 @@ export function assembleProviders(
   const providerEnvVars: string[] = [];
   const humanParts: string[] = [];
 
-  const hasImessageCloud =
-    providers.includes("imessage") && imessageMode === "cloud";
-  const hasImessageLocal =
-    providers.includes("imessage") && imessageMode === "local";
+  const hasImessage = providers.includes("imessage");
 
   // Deterministic emission order, independent of how the caller listed them.
   const ordered: Provider[] = (
@@ -60,22 +44,12 @@ export function assembleProviders(
       imports.push(
         'import { imessage } from "spectrum-ts/providers/imessage";'
       );
-      if (imessageMode === "cloud") {
-        providerLines.push(
-          "    // iMessage cloud mode: tokens auto-renewed; lines managed in the Photon dashboard."
-        );
-        providerLines.push("    imessage.config(),");
-        topLevelEnvVars.push("PROJECT_ID", "PROJECT_SECRET");
-        humanParts.push("iMessage (cloud)");
-      } else {
-        providerLines.push(
-          IMESSAGE_LOCAL_WARNING.split("\n")
-            .map((l) => `    ${l}`)
-            .join("\n")
-        );
-        providerLines.push("    imessage.config({ local: true }),");
-        humanParts.push("iMessage (local)");
-      }
+      providerLines.push(
+        "    // iMessage: tokens auto-renewed; lines managed in the Photon dashboard."
+      );
+      providerLines.push("    imessage.config(),");
+      topLevelEnvVars.push("PROJECT_ID", "PROJECT_SECRET");
+      humanParts.push("iMessage");
     } else if (p === "whatsapp") {
       imports.push(
         'import { whatsappBusiness } from "spectrum-ts/providers/whatsapp-business";'
@@ -96,7 +70,7 @@ export function assembleProviders(
   const importsBlock = imports.join("\n");
 
   const configLines: string[] = [];
-  if (hasImessageCloud) {
+  if (hasImessage) {
     configLines.push("  projectId: process.env.PROJECT_ID!,");
     configLines.push("  projectSecret: process.env.PROJECT_SECRET!,");
   }
@@ -111,7 +85,6 @@ export function assembleProviders(
     topLevelEnvVars,
     providerEnvVars,
     needsEnvFile: topLevelEnvVars.length + providerEnvVars.length > 0,
-    hasImessageLocal,
     providersHuman: humanParts.join(", "),
   };
 }
@@ -142,7 +115,6 @@ export function templatesDir(): string {
 export interface CopyTokens {
   envBlock: string;
   envSetupBlock: string;
-  imessageLocalHintBlock: string;
   importsBlock: string;
   name: string;
   pmInstallCmd: string;
