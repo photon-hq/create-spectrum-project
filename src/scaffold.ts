@@ -171,10 +171,10 @@ async function resolveVersion(
   override: (() => Promise<string>) | undefined,
   logger: ScaffoldLogger
 ): Promise<string> {
-  if (override) {
-    return override();
-  }
   try {
+    if (override) {
+      return await override();
+    }
     const res = await fetch(NPM_REGISTRY, {
       headers: { accept: "application/json" },
     });
