@@ -49,6 +49,69 @@ describe("assembleProviders — terminal only", () => {
   });
 });
 
+describe("assembleProviders — imessage cloud", () => {
+  const r = assembleProviders(["imessage"], "cloud");
+
+  test("imports iMessage", () => {
+    expect(r.importsBlock).toContain('from "spectrum-ts/providers/imessage"');
+  });
+
+  test("top-level env vars are PROJECT_ID and PROJECT_SECRET", () => {
+    expect(r.topLevelEnvVars).toEqual(["PROJECT_ID", "PROJECT_SECRET"]);
+    expect(r.providerEnvVars).toEqual([]);
+  });
+
+  test("config body wires projectId and projectSecret", () => {
+    expect(r.spectrumConfigBody).toContain("projectId: process.env.PROJECT_ID!");
+    expect(r.spectrumConfigBody).toContain(
+      "projectSecret: process.env.PROJECT_SECRET!"
+    );
+  });
+
+  test("provider config takes no args in cloud mode", () => {
+    expect(r.spectrumConfigBody).toContain("imessage.config(),");
+    expect(r.spectrumConfigBody).not.toContain("imessage.config({");
+  });
+
+  test("needsEnvFile is true", () => {
+    expect(r.needsEnvFile).toBe(true);
+  });
+
+  test("hasImessageLocal is false", () => {
+    expect(r.hasImessageLocal).toBe(false);
+  });
+});
+
+describe("assembleProviders — imessage local", () => {
+  const r = assembleProviders(["imessage"], "local");
+
+  test("provider config uses { local: true }", () => {
+    expect(r.spectrumConfigBody).toContain("imessage.config({ local: true })");
+  });
+
+  test("no env vars (local doesn't use PROJECT_ID/SECRET)", () => {
+    expect(r.topLevelEnvVars).toEqual([]);
+    expect(r.providerEnvVars).toEqual([]);
+    expect(r.needsEnvFile).toBe(false);
+  });
+
+  test("config body has no projectId or projectSecret", () => {
+    expect(r.spectrumConfigBody).not.toContain("projectId");
+    expect(r.spectrumConfigBody).not.toContain("projectSecret");
+  });
+
+  test("hasImessageLocal is true", () => {
+    expect(r.hasImessageLocal).toBe(true);
+  });
+
+  test("warning block is embedded in the provider section", () => {
+    expect(r.spectrumConfigBody).toContain(
+      "⚠ Local iMessage mode requirements:"
+    );
+    expect(r.spectrumConfigBody).toContain("Full Disk Access");
+  });
+});
+
 describe("assembleProviders — empty input rejected", () => {
   test("throws on empty providers list", () => {
     expect(() => assembleProviders([], "cloud")).toThrow();

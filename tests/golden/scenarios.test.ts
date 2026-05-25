@@ -16,9 +16,8 @@ interface Scenario {
 
 const SCENARIOS: Scenario[] = [
   { name: "terminal-only", providers: ["terminal"] },
-  // Added in Task 4:
-  // { name: "imessage-cloud", providers: ["imessage"], imessageMode: "cloud" },
-  // { name: "imessage-local", providers: ["imessage"], imessageMode: "local" },
+  { name: "imessage-cloud", providers: ["imessage"], imessageMode: "cloud" },
+  { name: "imessage-local", providers: ["imessage"], imessageMode: "local" },
   // Added in Task 5:
   // { name: "whatsapp-only", providers: ["whatsapp"] },
   // { name: "all-production", providers: ["imessage", "whatsapp"], imessageMode: "cloud" },
