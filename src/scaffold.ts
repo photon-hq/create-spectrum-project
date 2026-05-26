@@ -97,7 +97,7 @@ export const FALLBACK_SPECTRUM_TS_VERSION = "^0.0.0";
 const MANIFEST_URL = "https://unpkg.com/spectrum-ts/manifest.json";
 
 /**
- * Last-known-good manifest, bundled at create-spectrum-app release time so
+ * Last-known-good manifest, bundled at create-spectrum-project release time so
  * scaffolds work offline / when unpkg is down. Updated by the same release
  * step that pins {@link FALLBACK_SPECTRUM_TS_VERSION}.
  */
@@ -218,7 +218,7 @@ export async function scaffold(
   // tmpfs but the target lives on /home, etc.).
   const targetParent = dirname(targetDir);
   await mkdir(targetParent, { recursive: true });
-  const tmp = await mkdtemp(join(targetParent, ".create-spectrum-app-"));
+  const tmp = await mkdtemp(join(targetParent, ".create-spectrum-project-"));
   let copied = false;
   try {
     logger.step("Copying template…");
@@ -447,10 +447,10 @@ async function tryGitInit(
     }
     const commitEnv = {
       ...process.env,
-      GIT_AUTHOR_NAME: process.env.GIT_AUTHOR_NAME ?? "create-spectrum-app",
+      GIT_AUTHOR_NAME: process.env.GIT_AUTHOR_NAME ?? "create-spectrum-project",
       GIT_AUTHOR_EMAIL: process.env.GIT_AUTHOR_EMAIL ?? "noreply@photon.codes",
       GIT_COMMITTER_NAME:
-        process.env.GIT_COMMITTER_NAME ?? "create-spectrum-app",
+        process.env.GIT_COMMITTER_NAME ?? "create-spectrum-project",
       GIT_COMMITTER_EMAIL:
         process.env.GIT_COMMITTER_EMAIL ?? "noreply@photon.codes",
     };
@@ -459,7 +459,7 @@ async function tryGitInit(
       [
         "commit",
         "-m",
-        "Initial commit from create-spectrum-app",
+        "Initial commit from create-spectrum-project",
         "--no-verify",
       ],
       { cwd, env: commitEnv }

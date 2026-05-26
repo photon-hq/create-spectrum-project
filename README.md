@@ -1,9 +1,9 @@
-# create-spectrum-app
+# create-spectrum-project
 
 Scaffold a new [Spectrum](https://photon.codes/docs/spectrum-ts/introduction) project in seconds.
 
 ```sh
-bunx create-spectrum-app my-app
+bunx create-spectrum-project my-app
 # or
 npm create spectrum-app@latest my-app
 ```
