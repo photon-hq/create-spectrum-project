@@ -43,7 +43,7 @@ Options:
 Defaults (applied by `-y` and as fallbacks for any flag you don't set):
 
 - Directory: `my-spectrum-app`
-- Providers: `terminal`
+- Providers: `imessage` (first platform in the manifest)
 - Package manager: detected from your shell, otherwise `bun`
 - Install dependencies: yes
 - Initialize git: yes
@@ -51,8 +51,11 @@ Defaults (applied by `-y` and as fallbacks for any flag you don't set):
 Examples:
 
 ```sh
-# Terminal sandbox, no prompts, all defaults
+# iMessage, no prompts, all defaults
 bunx create-spectrum-project -y
+
+# Terminal sandbox (dev TUI, no credentials)
+bunx create-spectrum-project my-app --providers terminal
 
 # iMessage + WhatsApp on pnpm, skip git
 bunx create-spectrum-project my-app --providers imessage,whatsapp-business --pm pnpm --no-git

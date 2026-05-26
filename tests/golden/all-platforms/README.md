@@ -1,4 +1,4 @@
-# all-production
+# all-platforms
 
 A [Spectrum](https://photon.codes/docs/spectrum-ts) project. Wired with: iMessage, WhatsApp Business.
 

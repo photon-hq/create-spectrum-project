@@ -23,7 +23,7 @@ import {
 
 /**
  * The dev-only TUI provider. Special-cased throughout: it doesn't need
- * top-level Spectrum credentials, and it can't be mixed with production
+ * top-level Spectrum credentials, and it can't be mixed with platform
  * providers (its TUI grabs the terminal and would hide startup errors
  * from concurrent providers). Hardcoded by name because these constraints
  * live in this CLI's UX, not in the spectrum-ts manifest.

@@ -183,15 +183,17 @@ function parseProviders(raw: string, manifest: Manifest): Provider[] {
   }
   if (parts.includes(TERMINAL_KEY) && parts.length > 1) {
     fail(
-      `${TERMINAL_KEY} is a dev-only TUI and can't be mixed with production providers. Pick ${TERMINAL_KEY} on its own, or pick one or more of: ${validKeys.filter((k) => k !== TERMINAL_KEY).join(", ")}.`
+      `${TERMINAL_KEY} is a dev-only TUI and can't be mixed with platform providers. Pick ${TERMINAL_KEY} on its own, or pick one or more of: ${validKeys.filter((k) => k !== TERMINAL_KEY).join(", ")}.`
     );
   }
   return parts;
 }
 
 function fillDefaults(partial: PartialOptions, manifest: Manifest) {
+  // Default to the first platform provider (alphabetical by key in the
+  // manifest). Falls back to terminal only if no platform providers exist.
   const fallbackProvider =
-    manifest.find((m) => m.key === TERMINAL_KEY)?.key ?? manifest[0]?.key;
+    manifest.find((m) => m.key !== TERMINAL_KEY)?.key ?? manifest[0]?.key;
   if (!fallbackProvider) {
     fail("Manifest is empty — no providers to scaffold.");
   }

@@ -29,7 +29,7 @@ const SCENARIOS: Scenario[] = [
     expectedEnv: "PROJECT_ID=\nPROJECT_SECRET=",
   },
   {
-    name: "all-production",
+    name: "all-platforms",
     providers: ["imessage", "whatsapp-business"],
     expectedEnv: "PROJECT_ID=\nPROJECT_SECRET=",
   },

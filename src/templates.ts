@@ -34,12 +34,12 @@ export function assembleProviders(
     return entry;
   });
 
-  // Production = any non-terminal provider. Drives whether the generated
+  // A platform = any non-terminal provider. Drives whether the generated
   // `Spectrum({...})` call includes top-level projectId/projectSecret.
-  const hasProduction = selected.some((m) => m.key !== TERMINAL_KEY);
+  const hasPlatform = selected.some((m) => m.key !== TERMINAL_KEY);
 
   // Deterministic emission order: terminal first if present, then
-  // production providers in their manifest order (alphabetical by key,
+  // platform providers in their manifest order (alphabetical by key,
   // since spectrum-ts's generator sorts that way).
   const ordered = [
     ...selected.filter((m) => m.key === TERMINAL_KEY),
@@ -62,7 +62,7 @@ export function assembleProviders(
   const importsBlock = imports.join("\n");
 
   const configLines: string[] = [];
-  if (hasProduction) {
+  if (hasPlatform) {
     configLines.push("  projectId: process.env.PROJECT_ID!,");
     configLines.push("  projectSecret: process.env.PROJECT_SECRET!,");
   }
@@ -70,14 +70,14 @@ export function assembleProviders(
   configLines.push(...providerLines);
   configLines.push("  ],");
 
-  const topLevelEnvVars = hasProduction ? ["PROJECT_ID", "PROJECT_SECRET"] : [];
+  const topLevelEnvVars = hasPlatform ? ["PROJECT_ID", "PROJECT_SECRET"] : [];
 
   return {
     importsBlock,
     spectrumConfigBody: configLines.join("\n"),
     topLevelEnvVars,
     providerEnvVars: [],
-    needsEnvFile: hasProduction,
+    needsEnvFile: hasPlatform,
     providersHuman: humanParts.join(", "),
   };
 }
