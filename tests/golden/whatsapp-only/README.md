@@ -4,13 +4,9 @@ A [Spectrum](https://photon.codes/docs/spectrum-ts) project. Wired with: WhatsAp
 
 ## Environment
 
-Before running, copy `.env.example` to `.env` and fill in the values:
+Before running, open `.env` and fill in the values:
 
-```sh
-cp .env.example .env
-```
-
-From your project Settings on the [Photon dashboard](https://photon.codes):
+From your project Settings on the [Photon dashboard](https://app.photon.codes):
 
 - `PROJECT_ID`
 - `PROJECT_SECRET`

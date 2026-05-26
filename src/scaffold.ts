@@ -23,7 +23,7 @@ import {
 
 /**
  * The dev-only TUI provider. Special-cased throughout: it doesn't need
- * top-level Spectrum credentials, and it can't be mixed with production
+ * top-level Spectrum credentials, and it can't be mixed with platform
  * providers (its TUI grabs the terminal and would hide startup errors
  * from concurrent providers). Hardcoded by name because these constraints
  * live in this CLI's UX, not in the spectrum-ts manifest.
@@ -226,13 +226,21 @@ export async function scaffold(
       emitEnvFile: assembly.needsEnvFile,
     });
 
-    if (options.credentials && assembly.needsEnvFile) {
-      const realEnv = [
-        `PROJECT_ID=${options.credentials.projectId}`,
-        `PROJECT_SECRET=${options.credentials.projectSecret}`,
-        ...assembly.providerEnvVars.map((k) => `${k}=`),
-      ].join("\n");
-      await writeFile(join(tmp, ".env"), realEnv);
+    if (assembly.needsEnvFile) {
+      const envLines: string[] = [];
+      for (const k of assembly.topLevelEnvVars) {
+        if (k === "PROJECT_ID" && options.credentials) {
+          envLines.push(`PROJECT_ID=${options.credentials.projectId}`);
+        } else if (k === "PROJECT_SECRET" && options.credentials) {
+          envLines.push(`PROJECT_SECRET=${options.credentials.projectSecret}`);
+        } else {
+          envLines.push(`${k}=`);
+        }
+      }
+      for (const k of assembly.providerEnvVars) {
+        envLines.push(`${k}=`);
+      }
+      await writeFile(join(tmp, ".env"), envLines.join("\n"));
     }
 
     await rename(tmp, targetDir);
@@ -363,16 +371,12 @@ function buildEnvSetupBlock(top: string[], provider: string[]): string {
   const lines: string[] = [
     "## Environment",
     "",
-    "Before running, copy `.env.example` to `.env` and fill in the values:",
-    "",
-    "```sh",
-    "cp .env.example .env",
-    "```",
+    "Before running, open `.env` and fill in the values:",
     "",
   ];
   if (top.length > 0) {
     lines.push(
-      "From your project Settings on the [Photon dashboard](https://photon.codes):"
+      "From your project Settings on the [Photon dashboard](https://app.photon.codes):"
     );
     lines.push("");
     for (const k of top) {
