@@ -6,7 +6,7 @@ A [Spectrum](https://photon.codes/docs/spectrum-ts) project. Wired with: iMessag
 
 Before running, open `.env` and fill in the values:
 
-From your project Settings on the [Photon dashboard](https://photon.codes):
+From your project Settings on the [Photon dashboard](https://app.photon.codes):
 
 - `PROJECT_ID`
 - `PROJECT_SECRET`

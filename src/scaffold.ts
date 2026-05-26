@@ -376,7 +376,7 @@ function buildEnvSetupBlock(top: string[], provider: string[]): string {
   ];
   if (top.length > 0) {
     lines.push(
-      "From your project Settings on the [Photon dashboard](https://photon.codes):"
+      "From your project Settings on the [Photon dashboard](https://app.photon.codes):"
     );
     lines.push("");
     for (const k of top) {
