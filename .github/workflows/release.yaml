@@ -16,6 +16,11 @@ jobs:
       service-name: create-spectrum-project
       working-directory: "."
       build-command: "bun run build"
-      use-oidc: true
+      # First publish has to go through NPM_TOKEN — npm OIDC Trusted Publishing
+      # can only be configured on npmjs.com after the package already exists,
+      # so the chicken-and-egg gets resolved by bootstrapping with the token.
+      # Flip back to true once create-spectrum-project is live and the trusted
+      # publisher is configured for this repo + Release workflow on npmjs.com.
+      use-oidc: false
       dry-run: false
     secrets: inherit
