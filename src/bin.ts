@@ -216,27 +216,22 @@ function printNextSteps(
   const pm = opts.packageManager ?? "bun";
   const cwd = basename(result.targetDir);
 
-  interface Step {
-    cmd: string;
-    comment?: string;
-  }
+  type Step = { cmd: string } | { note: string };
   const steps: Step[] = [{ cmd: `cd ${cwd}` }];
   if (!result.steps.installed) {
     steps.push({ cmd: pm === "yarn" ? "yarn" : `${pm} install` });
   }
   if (result.needsEnvFile) {
-    steps.push({
-      cmd: "cp .env.example .env",
-      comment: "add your credentials",
-    });
+    steps.push({ note: "fill in .env with your credentials" });
   }
   steps.push({ cmd: pm === "npm" ? "npm run start" : `${pm} start` });
 
   process.stdout.write(`\n${pc.bold("Next steps")}\n`);
-  for (const { cmd, comment } of steps) {
-    const line = comment
-      ? `  ${pc.dim("$")} ${cmd}  ${pc.dim(`# ${comment}`)}`
-      : `  ${pc.dim("$")} ${cmd}`;
+  for (const step of steps) {
+    const line =
+      "cmd" in step
+        ? `  ${pc.dim("$")} ${step.cmd}`
+        : `  ${pc.dim(`# ${step.note}`)}`;
     process.stdout.write(`${line}\n`);
   }
 }

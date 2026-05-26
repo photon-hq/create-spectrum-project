@@ -20,7 +20,7 @@ You'll be asked for:
 - Your package manager (auto-detected)
 - Whether to install dependencies and initialize git
 
-The generated project includes `src/index.ts` with the selected providers wired in, a `package.json` pinned to the current `spectrum-ts` release, an `.env.example` for any required credentials, and an echo loop that runs on `bun start`.
+The generated project includes `src/index.ts` with the selected providers wired in, a `package.json` pinned to the current `spectrum-ts` release, a ready-to-fill `.env` (plus a tracked `.env.example`) for any required credentials, and an echo loop that runs on `bun start`.
 
 ## Non-interactive
 

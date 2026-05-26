@@ -47,6 +47,11 @@ async function snapshot(dir: string): Promise<Record<string, string>> {
     if (!entry.isFile()) {
       continue;
     }
+    // .env is gitignored in the published template, so it can't live in the
+    // committed golden tree. Scenarios assert its content inline instead.
+    if (entry.name === ".env") {
+      continue;
+    }
     const abs = join(entry.parentPath, entry.name);
     const rel = relative(dir, abs);
     out[rel] = await readFile(abs, "utf8");

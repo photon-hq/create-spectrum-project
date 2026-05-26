@@ -1,4 +1,5 @@
-import { describe, test } from "bun:test";
+import { describe, expect, test } from "bun:test";
+import { readFile, stat } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { type Provider, scaffold } from "~/scaffold.ts";
@@ -12,15 +13,25 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 interface Scenario {
   name: string;
   providers: Provider[];
+  expectedEnv: string | null;
 }
 
 const SCENARIOS: Scenario[] = [
-  { name: "terminal-only", providers: ["terminal"] },
-  { name: "imessage", providers: ["imessage"] },
-  { name: "whatsapp-only", providers: ["whatsapp-business"] },
+  { name: "terminal-only", providers: ["terminal"], expectedEnv: null },
+  {
+    name: "imessage",
+    providers: ["imessage"],
+    expectedEnv: "PROJECT_ID=\nPROJECT_SECRET=",
+  },
+  {
+    name: "whatsapp-only",
+    providers: ["whatsapp-business"],
+    expectedEnv: "PROJECT_ID=\nPROJECT_SECRET=",
+  },
   {
     name: "all-production",
     providers: ["imessage", "whatsapp-business"],
+    expectedEnv: "PROJECT_ID=\nPROJECT_SECRET=",
   },
 ];
 
@@ -40,6 +51,13 @@ describe("golden scenarios", () => {
           resolveSpectrumTsVersion: () => Promise.resolve("^1.2.3"),
         });
         await assertMatchesGolden(target, join(HERE, scenario.name));
+
+        const envPath = join(target, ".env");
+        if (scenario.expectedEnv === null) {
+          expect(stat(envPath)).rejects.toMatchObject({ code: "ENOENT" });
+        } else {
+          expect(await readFile(envPath, "utf8")).toBe(scenario.expectedEnv);
+        }
       });
     });
   }

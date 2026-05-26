@@ -4,11 +4,7 @@ A [Spectrum](https://photon.codes/docs/spectrum-ts) project. Wired with: iMessag
 
 ## Environment
 
-Before running, copy `.env.example` to `.env` and fill in the values:
-
-```sh
-cp .env.example .env
-```
+Before running, open `.env` and fill in the values:
 
 From your project Settings on the [Photon dashboard](https://photon.codes):
 
