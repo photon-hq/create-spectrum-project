@@ -2,7 +2,7 @@ import type { Manifest } from "~/scaffold.ts";
 
 /**
  * Fixture manifest mirroring spectrum-ts@1.13.0's published manifest at the
- * time create-spectrum-app v1 was written. Tests use this so they're not
+ * time create-spectrum-project v1 was written. Tests use this so they're not
  * coupled to whatever the live manifest happens to be on any given run.
  *
  * Keep in sync with the bundled `FALLBACK_MANIFEST` in src/scaffold.ts so

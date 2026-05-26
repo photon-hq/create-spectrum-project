@@ -65,12 +65,12 @@ async function main(): Promise<number> {
     return 0;
   }
   if (values.version) {
-    process.stdout.write(`create-spectrum-app ${version}\n`);
+    process.stdout.write(`create-spectrum-project ${version}\n`);
     return 0;
   }
 
   process.stdout.write(
-    `\n${pc.bold("create-spectrum-app")} ${pc.dim(`v${version}`)}\n\n`
+    `\n${pc.bold("create-spectrum-project")} ${pc.dim(`v${version}`)}\n\n`
   );
 
   // Fetch the live provider list before prompts or flag validation can run,
@@ -333,7 +333,7 @@ function printHelp(): void {
     [
       "",
       `  ${pc.bold("Usage")}`,
-      `    ${dim("$")} create-spectrum-app ${dim("[directory] [options]")}`,
+      `    ${dim("$")} create-spectrum-project ${dim("[directory] [options]")}`,
       "",
       `  ${pc.bold("Options")}`,
       ...rows.map(([k, v]) => `    ${k}${dim(v)}`),

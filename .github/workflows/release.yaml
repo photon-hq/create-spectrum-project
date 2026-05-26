@@ -1,0 +1,21 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  pull-requests: read
+  id-token: write
+
+jobs:
+  release:
+    uses: photon-hq/buildspace/.github/workflows/typescript-service-release.yaml@main
+    with:
+      service-name: create-spectrum-project
+      working-directory: "."
+      build-command: "bun run build"
+      use-oidc: true
+      dry-run: false
+    secrets: inherit
