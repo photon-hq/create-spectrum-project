@@ -54,7 +54,7 @@ describe("golden scenarios", () => {
 
         const envPath = join(target, ".env");
         if (scenario.expectedEnv === null) {
-          expect(stat(envPath)).rejects.toMatchObject({ code: "ENOENT" });
+          await expect(stat(envPath)).rejects.toMatchObject({ code: "ENOENT" });
         } else {
           expect(await readFile(envPath, "utf8")).toBe(scenario.expectedEnv);
         }
