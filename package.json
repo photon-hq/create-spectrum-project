@@ -1,6 +1,6 @@
 {
   "name": "create-spectrum-project",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Scaffold a new Spectrum (spectrum-ts) project in seconds.",
   "keywords": [
     "spectrum",
@@ -12,13 +12,13 @@
   ],
   "author": "Photon",
   "license": "MIT",
-  "homepage": "https://github.com/photon-hq/create-spectrum-app#readme",
+  "homepage": "https://github.com/photon-hq/create-spectrum-project#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/photon-hq/create-spectrum-app.git"
+    "url": "git+https://github.com/photon-hq/create-spectrum-project.git"
   },
   "bugs": {
-    "url": "https://github.com/photon-hq/create-spectrum-app/issues"
+    "url": "https://github.com/photon-hq/create-spectrum-project/issues"
   },
   "type": "module",
   "bin": {
