@@ -8,14 +8,10 @@ const app = await Spectrum({
   projectId: process.env.PROJECT_ID!,
   projectSecret: process.env.PROJECT_SECRET!,
   providers: [
-    // iMessage: tokens auto-renewed; lines managed in the Photon dashboard.
+    // iMessage
     imessage.config(),
-    // WhatsApp Business: 1:1 conversations via Meta Cloud API.
-    whatsappBusiness.config({
-      accessToken: process.env.WA_TOKEN!,
-      phoneNumberId: process.env.WA_NUMBER_ID!,
-      appSecret: process.env.WA_SECRET!,
-    }),
+    // WhatsApp Business
+    whatsappBusiness.config(),
   ],
 });
 

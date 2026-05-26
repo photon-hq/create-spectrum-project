@@ -1,6 +1,6 @@
 # terminal-only
 
-A [Spectrum](https://photon.codes/docs/spectrum-ts) project. Wired with: terminal.
+A [Spectrum](https://photon.codes/docs/spectrum-ts) project. Wired with: Terminal.
 
 ## Run
 

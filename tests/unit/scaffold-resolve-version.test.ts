@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { FALLBACK_SPECTRUM_TS_VERSION, scaffold } from "~/scaffold.ts";
 import { silentLogger } from "../helpers/logger.ts";
+import { FIXTURE_MANIFEST } from "../helpers/manifest.ts";
 import { tempTarget, withTempDir } from "../helpers/tempdir.ts";
 
 describe("scaffold — version resolution", () => {
@@ -10,6 +11,7 @@ describe("scaffold — version resolution", () => {
       const result = await scaffold({
         targetDir: tempTarget(dir),
         providers: ["terminal"],
+        manifest: FIXTURE_MANIFEST,
         install: false,
         git: false,
         logger,
@@ -30,6 +32,7 @@ describe("scaffold — version resolution", () => {
       const result = await scaffold({
         targetDir: tempTarget(dir),
         providers: ["terminal"],
+        manifest: FIXTURE_MANIFEST,
         install: false,
         git: false,
         logger,

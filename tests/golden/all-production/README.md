@@ -15,12 +15,6 @@ From your project Settings on the [Photon dashboard](https://photon.codes):
 - `PROJECT_ID`
 - `PROJECT_SECRET`
 
-From [Meta for Developers](https://developers.facebook.com) (WhatsApp Business):
-
-- `WA_TOKEN`
-- `WA_NUMBER_ID`
-- `WA_SECRET`
-
 ## Run
 
 ```sh

@@ -1,7 +1,7 @@
 import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
-import type { Provider } from "./scaffold.ts";
+import { type Manifest, type Provider, TERMINAL_KEY } from "./scaffold.ts";
 
 export interface ProviderAssembly {
   importsBlock: string;
@@ -12,79 +12,72 @@ export interface ProviderAssembly {
   topLevelEnvVars: string[];
 }
 
-export function assembleProviders(providers: Provider[]): ProviderAssembly {
+export function assembleProviders(
+  providers: Provider[],
+  manifest: Manifest
+): ProviderAssembly {
   if (providers.length === 0) {
     throw new Error("assembleProviders: at least one provider required");
   }
 
+  // Resolve every selected key against the manifest up front. Catches
+  // typos and stale CLI args before we start composing code.
+  const selected = providers.map((key) => {
+    const entry = manifest.find((m) => m.key === key);
+    if (!entry) {
+      throw new Error(
+        `Unknown provider "${key}". Available: ${manifest
+          .map((m) => m.key)
+          .join(", ")}`
+      );
+    }
+    return entry;
+  });
+
+  // Production = any non-terminal provider. Drives whether the generated
+  // `Spectrum({...})` call includes top-level projectId/projectSecret.
+  const hasProduction = selected.some((m) => m.key !== TERMINAL_KEY);
+
+  // Deterministic emission order: terminal first if present, then
+  // production providers in their manifest order (alphabetical by key,
+  // since spectrum-ts's generator sorts that way).
+  const ordered = [
+    ...selected.filter((m) => m.key === TERMINAL_KEY),
+    ...manifest
+      .filter((m) => m.key !== TERMINAL_KEY)
+      .filter((m) => selected.some((s) => s.key === m.key)),
+  ];
+
   const imports = ['import { Spectrum } from "spectrum-ts";'];
   const providerLines: string[] = [];
-  const topLevelEnvVars: string[] = [];
-  const providerEnvVars: string[] = [];
   const humanParts: string[] = [];
 
-  const hasImessage = providers.includes("imessage");
-
-  // Deterministic emission order, independent of how the caller listed them.
-  const ordered: Provider[] = (
-    ["terminal", "imessage", "whatsapp"] as Provider[]
-  ).filter((p) => providers.includes(p));
-
-  for (const p of ordered) {
-    if (p === "terminal") {
-      imports.push(
-        'import { terminal } from "spectrum-ts/providers/terminal";'
-      );
-      providerLines.push(
-        "    // Terminal opens a chat TUI for local development — no credentials needed."
-      );
-      providerLines.push("    terminal.config(),");
-      humanParts.push("terminal");
-    } else if (p === "imessage") {
-      imports.push(
-        'import { imessage } from "spectrum-ts/providers/imessage";'
-      );
-      providerLines.push(
-        "    // iMessage: tokens auto-renewed; lines managed in the Photon dashboard."
-      );
-      providerLines.push("    imessage.config(),");
-      topLevelEnvVars.push("PROJECT_ID", "PROJECT_SECRET");
-      humanParts.push("iMessage");
-    } else if (p === "whatsapp") {
-      imports.push(
-        'import { whatsappBusiness } from "spectrum-ts/providers/whatsapp-business";'
-      );
-      providerLines.push(
-        "    // WhatsApp Business: 1:1 conversations via Meta Cloud API."
-      );
-      providerLines.push("    whatsappBusiness.config({");
-      providerLines.push("      accessToken: process.env.WA_TOKEN!,");
-      providerLines.push("      phoneNumberId: process.env.WA_NUMBER_ID!,");
-      providerLines.push("      appSecret: process.env.WA_SECRET!,");
-      providerLines.push("    }),");
-      providerEnvVars.push("WA_TOKEN", "WA_NUMBER_ID", "WA_SECRET");
-      humanParts.push("WhatsApp Business");
-    }
+  for (const meta of ordered) {
+    imports.push(`import { ${meta.import} } from "${meta.path}";`);
+    providerLines.push(`    // ${meta.label}`);
+    providerLines.push(`    ${meta.import}.config(),`);
+    humanParts.push(meta.label);
   }
 
   const importsBlock = imports.join("\n");
 
   const configLines: string[] = [];
-  if (hasImessage) {
+  if (hasProduction) {
     configLines.push("  projectId: process.env.PROJECT_ID!,");
     configLines.push("  projectSecret: process.env.PROJECT_SECRET!,");
   }
   configLines.push("  providers: [");
   configLines.push(...providerLines);
   configLines.push("  ],");
-  const spectrumConfigBody = configLines.join("\n");
+
+  const topLevelEnvVars = hasProduction ? ["PROJECT_ID", "PROJECT_SECRET"] : [];
 
   return {
     importsBlock,
-    spectrumConfigBody,
+    spectrumConfigBody: configLines.join("\n"),
     topLevelEnvVars,
-    providerEnvVars,
-    needsEnvFile: topLevelEnvVars.length + providerEnvVars.length > 0,
+    providerEnvVars: [],
+    needsEnvFile: hasProduction,
     providersHuman: humanParts.join(", "),
   };
 }

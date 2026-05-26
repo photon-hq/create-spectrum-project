@@ -21,13 +21,42 @@ import {
   templatesDir,
 } from "./templates.ts";
 
-export type Provider = "terminal" | "imessage" | "whatsapp";
+/**
+ * The dev-only TUI provider. Special-cased throughout: it doesn't need
+ * top-level Spectrum credentials, and it can't be mixed with production
+ * providers (its TUI grabs the terminal and would hide startup errors
+ * from concurrent providers). Hardcoded by name because these constraints
+ * live in this CLI's UX, not in the spectrum-ts manifest.
+ */
+export const TERMINAL_KEY = "terminal";
+
+/** A provider key as exposed by spectrum-ts's `manifest.json`. */
+export type Provider = string;
+
+export interface ManifestEntry {
+  /** Exported const name to import (e.g. "whatsappBusiness"). */
+  import: string;
+  /** Provider key — also the npm subpath segment (e.g. "whatsapp-business"). */
+  key: string;
+  /** Human-readable label (e.g. "WhatsApp Business"). */
+  label: string;
+  /** Full bare-specifier import path (e.g. "spectrum-ts/providers/whatsapp-business"). */
+  path: string;
+}
+
+export type Manifest = ManifestEntry[];
 
 export interface ScaffoldOptions {
   credentials?: { projectId: string; projectSecret: string };
   git?: boolean;
   install?: boolean;
   logger?: ScaffoldLogger;
+  /**
+   * Provider manifest fetched from `spectrum-ts/manifest.json`. Callers should
+   * use {@link fetchManifest} to get this. Required so scaffold() never has to
+   * hit the network itself — keeps the function synchronously testable.
+   */
+  manifest: Manifest;
   name?: string;
   packageManager?: PackageManager;
   providers: Provider[];
@@ -65,6 +94,91 @@ export class InstallError extends Error {
 
 export const FALLBACK_SPECTRUM_TS_VERSION = "^0.0.0";
 
+const MANIFEST_URL = "https://unpkg.com/spectrum-ts/manifest.json";
+
+/**
+ * Last-known-good manifest, bundled at create-spectrum-app release time so
+ * scaffolds work offline / when unpkg is down. Updated by the same release
+ * step that pins {@link FALLBACK_SPECTRUM_TS_VERSION}.
+ */
+export const FALLBACK_MANIFEST: Manifest = [
+  {
+    key: "imessage",
+    import: "imessage",
+    path: "spectrum-ts/providers/imessage",
+    label: "iMessage",
+  },
+  {
+    key: "slack",
+    import: "slack",
+    path: "spectrum-ts/providers/slack",
+    label: "Slack",
+  },
+  {
+    key: "terminal",
+    import: "terminal",
+    path: "spectrum-ts/providers/terminal",
+    label: "Terminal",
+  },
+  {
+    key: "whatsapp-business",
+    import: "whatsappBusiness",
+    path: "spectrum-ts/providers/whatsapp-business",
+    label: "WhatsApp Business",
+  },
+];
+
+function isManifestEntry(value: unknown): value is ManifestEntry {
+  if (typeof value !== "object" || value === null) {
+    return false;
+  }
+  const entry = value as Record<string, unknown>;
+  return (
+    typeof entry.key === "string" &&
+    typeof entry.import === "string" &&
+    typeof entry.path === "string" &&
+    typeof entry.label === "string"
+  );
+}
+
+/**
+ * Fetch the spectrum-ts provider manifest from unpkg, falling back to the
+ * bundled snapshot on any network/parse failure.
+ *
+ * Pulled out of {@link scaffold} so the bin can fetch once at startup,
+ * validate `--providers` flag input against the live list, and feed the
+ * same manifest into prompts and scaffold without duplicate network calls.
+ */
+export async function fetchManifest(
+  logger?: ScaffoldLogger
+): Promise<Manifest> {
+  try {
+    const res = await fetch(MANIFEST_URL, {
+      headers: { accept: "application/json" },
+    });
+    if (!res.ok) {
+      throw new Error(`unpkg responded ${res.status}`);
+    }
+    const data: unknown = await res.json();
+    if (!Array.isArray(data)) {
+      throw new Error("manifest is not an array");
+    }
+    for (const entry of data) {
+      if (!isManifestEntry(entry)) {
+        throw new Error(`malformed manifest entry: ${JSON.stringify(entry)}`);
+      }
+    }
+    return data;
+  } catch (err) {
+    logger?.warn(
+      `Could not fetch spectrum-ts manifest from ${MANIFEST_URL} (${
+        err instanceof Error ? err.message : String(err)
+      }); using bundled fallback (${FALLBACK_MANIFEST.length} providers).`
+    );
+    return FALLBACK_MANIFEST;
+  }
+}
+
 const NOOP_LOGGER: ScaffoldLogger = {
   step: (msg) => process.stderr.write(`${msg}\n`),
   warn: (msg) => process.stderr.write(`warn: ${msg}\n`),
@@ -95,7 +209,7 @@ export async function scaffold(
     logger
   );
 
-  const assembly = assembleProviders(options.providers);
+  const assembly = assembleProviders(options.providers, options.manifest);
 
   const tokens = buildTokens({ name, spectrumTsVersion, assembly, pm });
 

@@ -7,10 +7,13 @@ import pc from "picocolors";
 import { isPm, type PackageManager } from "./pm.ts";
 import { type PartialOptions, promptForOptions } from "./prompts.ts";
 import {
+  fetchManifest,
   InstallError,
+  type Manifest,
   type Provider,
   scaffold,
   TargetExistsError,
+  TERMINAL_KEY,
   VersionResolutionError,
 } from "./scaffold.ts";
 
@@ -20,6 +23,21 @@ const SYM = {
   arrow: pc.dim("→"),
   dot: pc.dim("·"),
 };
+
+/**
+ * Provider keys published in spectrum-ts's manifest but intentionally hidden
+ * from the CLI surface — usually because they're not yet ready for public
+ * scaffolding (in-flight integrations, internal-only, etc.).
+ *
+ * Filtered out before prompts render and rejected by `--providers` flag
+ * validation. The underlying library API still supports them, so internal
+ * tooling (e.g. `photon spectrum init`) can opt in.
+ */
+const HIDDEN_PROVIDERS = new Set<string>(["slack"]);
+
+function visibleManifest(manifest: Manifest): Manifest {
+  return manifest.filter((m) => !HIDDEN_PROVIDERS.has(m.key));
+}
 
 async function main(): Promise<number> {
   const { values, positionals } = parseArgs({
@@ -51,15 +69,31 @@ async function main(): Promise<number> {
     return 0;
   }
 
-  const partial = collectFlagOptions(values, positionals);
-
   process.stdout.write(
     `\n${pc.bold("create-spectrum-app")} ${pc.dim(`v${version}`)}\n\n`
   );
 
+  // Fetch the live provider list before prompts or flag validation can run,
+  // so both consult the same source of truth. Fail-soft to the bundled
+  // fallback if unpkg is unreachable.
+  const fullManifest = await fetchManifest({
+    step: () => {
+      // no spinner yet
+    },
+    warn: (msg) => {
+      process.stderr.write(`${pc.yellow("!")} ${msg}\n`);
+    },
+    stream: () => {
+      // no-op
+    },
+  });
+  const manifest = visibleManifest(fullManifest);
+
+  const partial = collectFlagOptions(values, positionals, manifest);
+
   const opts = values.yes
-    ? fillDefaults(partial)
-    : await promptForOptions(partial);
+    ? fillDefaults(partial, manifest)
+    : await promptForOptions(partial, manifest);
 
   // One blank line of breathing room before the spinner — only after prompts,
   // since the -y path already has its own blank between the banner and the spinner.
@@ -73,6 +107,7 @@ async function main(): Promise<number> {
   try {
     result = await scaffold({
       ...opts,
+      manifest: fullManifest,
       logger: {
         step: (msg) => spin.text(msg),
         warn: (msg) => {
@@ -107,14 +142,15 @@ async function main(): Promise<number> {
 
 function collectFlagOptions(
   values: Record<string, unknown>,
-  positionals: string[]
+  positionals: string[],
+  manifest: Manifest
 ): PartialOptions {
   const partial: PartialOptions = {};
   if (positionals[0]) {
     partial.targetDir = positionals[0];
   }
   if (typeof values.providers === "string") {
-    partial.providers = parseProviders(values.providers);
+    partial.providers = parseProviders(values.providers, manifest);
   }
   if (typeof values.pm === "string") {
     if (!isPm(values.pm)) {
@@ -131,30 +167,35 @@ function collectFlagOptions(
   return partial;
 }
 
-function parseProviders(raw: string): Provider[] {
-  const valid: Provider[] = ["terminal", "imessage", "whatsapp"];
+function parseProviders(raw: string, manifest: Manifest): Provider[] {
+  const validKeys = manifest.map((m) => m.key);
   const parts = raw
     .split(",")
     .map((s) => s.trim())
     .filter(Boolean);
   for (const p of parts) {
-    if (!(valid as string[]).includes(p)) {
-      fail(`Unknown provider: ${p}`);
+    if (!validKeys.includes(p)) {
+      fail(`Unknown provider: ${p}. Available: ${validKeys.join(", ")}`);
     }
   }
   if (parts.length === 0) {
     fail("--providers must list at least one provider");
   }
-  if (parts.includes("terminal") && parts.length > 1) {
+  if (parts.includes(TERMINAL_KEY) && parts.length > 1) {
     fail(
-      "terminal is a dev-only TUI and can't be mixed with iMessage / WhatsApp. Pick terminal on its own, or just iMessage and/or WhatsApp."
+      `${TERMINAL_KEY} is a dev-only TUI and can't be mixed with production providers. Pick ${TERMINAL_KEY} on its own, or pick one or more of: ${validKeys.filter((k) => k !== TERMINAL_KEY).join(", ")}.`
     );
   }
-  return parts as Provider[];
+  return parts;
 }
 
-function fillDefaults(partial: PartialOptions) {
-  const providers = partial.providers ?? (["terminal"] as Provider[]);
+function fillDefaults(partial: PartialOptions, manifest: Manifest) {
+  const fallbackProvider =
+    manifest.find((m) => m.key === TERMINAL_KEY)?.key ?? manifest[0]?.key;
+  if (!fallbackProvider) {
+    fail("Manifest is empty — no providers to scaffold.");
+  }
+  const providers = partial.providers ?? [fallbackProvider];
   return {
     targetDir: partial.targetDir ?? "my-spectrum-app",
     providers,
@@ -272,7 +313,7 @@ function printHelp(): void {
   const rows: [string, string][] = [
     [
       pad(`${flag("--providers")} <list>`),
-      "Comma-separated: terminal,imessage,whatsapp",
+      "Comma-separated provider keys (see Spectrum docs)",
     ],
     [
       pad(`${flag("--pm")} <m>`),

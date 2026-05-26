@@ -5,7 +5,7 @@ import { terminal } from "spectrum-ts/providers/terminal";
 // Docs: https://photon.codes/docs/spectrum-ts
 const app = await Spectrum({
   providers: [
-    // Terminal opens a chat TUI for local development — no credentials needed.
+    // Terminal
     terminal.config(),
   ],
 });

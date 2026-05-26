@@ -7,7 +7,7 @@ const app = await Spectrum({
   projectId: process.env.PROJECT_ID!,
   projectSecret: process.env.PROJECT_SECRET!,
   providers: [
-    // iMessage: tokens auto-renewed; lines managed in the Photon dashboard.
+    // iMessage
     imessage.config(),
   ],
 });

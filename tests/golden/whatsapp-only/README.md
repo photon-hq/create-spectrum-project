@@ -10,11 +10,10 @@ Before running, copy `.env.example` to `.env` and fill in the values:
 cp .env.example .env
 ```
 
-From [Meta for Developers](https://developers.facebook.com) (WhatsApp Business):
+From your project Settings on the [Photon dashboard](https://photon.codes):
 
-- `WA_TOKEN`
-- `WA_NUMBER_ID`
-- `WA_SECRET`
+- `PROJECT_ID`
+- `PROJECT_SECRET`
 
 ## Run
 

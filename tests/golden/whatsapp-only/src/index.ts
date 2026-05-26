@@ -4,13 +4,11 @@ import { whatsappBusiness } from "spectrum-ts/providers/whatsapp-business";
 // Each provider in `providers` adds an interface (terminal TUI, iMessage, …).
 // Docs: https://photon.codes/docs/spectrum-ts
 const app = await Spectrum({
+  projectId: process.env.PROJECT_ID!,
+  projectSecret: process.env.PROJECT_SECRET!,
   providers: [
-    // WhatsApp Business: 1:1 conversations via Meta Cloud API.
-    whatsappBusiness.config({
-      accessToken: process.env.WA_TOKEN!,
-      phoneNumberId: process.env.WA_NUMBER_ID!,
-      appSecret: process.env.WA_SECRET!,
-    }),
+    // WhatsApp Business
+    whatsappBusiness.config(),
   ],
 });
 
