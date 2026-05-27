@@ -285,7 +285,9 @@ export async function scaffold(
     installed = true;
   }
 
-  logger.step("Installing Spectrum skill…");
+  if (options.skills !== false) {
+    logger.step("Installing Spectrum skill…");
+  }
   const skillsInstalled = await skillsPromise;
 
   let gitInitialized = false;

@@ -237,10 +237,15 @@ function printNextSteps(
   }
   steps.push({ cmd: pm === "npm" ? "npm run start" : `${pm} start` });
   // We tried to install the skill but it failed (warned during scaffold).
-  // Surface a remediation hint so it's not buried in spinner output.
+  // Surface a remediation hint so it's not buried in spinner output. The
+  // runner picker matches `defaultSkillsRunner` so the printed command is
+  // the same one the scaffolder itself just ran — important because npx
+  // isn't guaranteed on Bun-only setups, and bunx isn't guaranteed on
+  // Node-only setups.
   if (opts.skills !== false && !result.steps.skillsInstalled) {
+    const runner = typeof process.versions.bun === "string" ? "bunx" : "npx";
     steps.push({
-      note: "spectrum skill install failed; retry: npx skills add photon-hq/skills --skill spectrum --agent '*' -y",
+      note: `spectrum skill install failed; retry: ${runner} -y skills add photon-hq/skills --skill spectrum --agent '*' -y`,
     });
   }
 
