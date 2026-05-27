@@ -47,6 +47,7 @@ describe("golden scenarios", () => {
           manifest: FIXTURE_MANIFEST,
           install: false,
           git: false,
+          skills: false,
           logger: silentLogger(),
           resolveSpectrumTsVersion: () => Promise.resolve("^1.2.3"),
         });

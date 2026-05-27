@@ -49,6 +49,7 @@ async function main(): Promise<number> {
       "no-install": { type: "boolean" },
       git: { type: "boolean", default: true },
       "no-git": { type: "boolean" },
+      "no-skills": { type: "boolean" },
       yes: { type: "boolean", short: "y" },
       verbose: { type: "boolean" },
       help: { type: "boolean", short: "h" },
@@ -164,6 +165,9 @@ function collectFlagOptions(
   if (values["no-git"]) {
     partial.git = false;
   }
+  if (values["no-skills"]) {
+    partial.skills = false;
+  }
   return partial;
 }
 
@@ -204,16 +208,21 @@ function fillDefaults(partial: PartialOptions, manifest: Manifest) {
     packageManager: partial.packageManager,
     install: partial.install ?? true,
     git: partial.git ?? true,
+    skills: partial.skills ?? true,
   } satisfies PartialOptions & { targetDir: string; providers: Provider[] };
 }
 
 function printNextSteps(
   result: {
     needsEnvFile: boolean;
-    steps: { installed: boolean; gitInitialized: boolean };
+    steps: {
+      installed: boolean;
+      skillsInstalled: boolean;
+      gitInitialized: boolean;
+    };
     targetDir: string;
   },
-  opts: { packageManager?: PackageManager }
+  opts: { packageManager?: PackageManager; skills?: boolean }
 ): void {
   const pm = opts.packageManager ?? "bun";
   const cwd = basename(result.targetDir);
@@ -227,6 +236,13 @@ function printNextSteps(
     steps.push({ note: "fill in .env with your credentials" });
   }
   steps.push({ cmd: pm === "npm" ? "npm run start" : `${pm} start` });
+  // We tried to install the skill but it failed (warned during scaffold).
+  // Surface a remediation hint so it's not buried in spinner output.
+  if (opts.skills !== false && !result.steps.skillsInstalled) {
+    steps.push({
+      note: "spectrum skill install failed; retry: npx skills add photon-hq/skills --skill spectrum --agent '*' -y",
+    });
+  }
 
   process.stdout.write(`\n${pc.bold("Next steps")}\n`);
   for (const step of steps) {
@@ -318,6 +334,7 @@ function printHelp(): void {
     ],
     [pad(flag("--no-install")), "Skip dependency install"],
     [pad(flag("--no-git")), "Skip git init"],
+    [pad(flag("--no-skills")), "Skip Spectrum skill install"],
     [
       pad(`${flag("-y")}, ${flag("--yes")}`),
       "Use defaults; skip interactive prompts",

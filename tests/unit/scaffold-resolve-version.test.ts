@@ -14,6 +14,7 @@ describe("scaffold — version resolution", () => {
         manifest: FIXTURE_MANIFEST,
         install: false,
         git: false,
+        skills: false,
         logger,
         resolveSpectrumTsVersion: () => Promise.resolve("^9.9.9"),
       });
@@ -35,6 +36,7 @@ describe("scaffold — version resolution", () => {
         manifest: FIXTURE_MANIFEST,
         install: false,
         git: false,
+        skills: false,
         logger,
         resolveSpectrumTsVersion: () => Promise.reject(new Error("offline")),
       });

@@ -106,6 +106,7 @@ export function templatesDir(): string {
 }
 
 export interface CopyTokens {
+  envAgentBlock: string;
   envBlock: string;
   envSetupBlock: string;
   importsBlock: string;
