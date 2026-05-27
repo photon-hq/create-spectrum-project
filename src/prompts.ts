@@ -9,6 +9,7 @@ export interface PartialOptions {
   install?: boolean;
   packageManager?: PackageManager;
   providers?: Provider[];
+  skills?: boolean;
   targetDir?: string;
 }
 
@@ -54,13 +55,59 @@ export async function promptForOptions(
       )
     ).value;
 
+  // Three yes/no prompts in pipeline order (install → skill → git). Each one
+  // short-circuits if its corresponding --no-* flag was passed, so the CLI
+  // surface stays: flag opts out, no flag asks, default is always yes.
+  const install =
+    partial.install ??
+    (
+      await prompts(
+        {
+          type: "confirm",
+          name: "value",
+          message: "Install dependencies?",
+          initial: true,
+        },
+        { onCancel }
+      )
+    ).value;
+
+  const skills =
+    partial.skills ??
+    (
+      await prompts(
+        {
+          type: "confirm",
+          name: "value",
+          message: "Install Spectrum skill for AI agents?",
+          initial: true,
+        },
+        { onCancel }
+      )
+    ).value;
+
+  const git =
+    partial.git ??
+    (
+      await prompts(
+        {
+          type: "confirm",
+          name: "value",
+          message: "Initialize git?",
+          initial: true,
+        },
+        { onCancel }
+      )
+    ).value;
+
   return {
     targetDir,
     providers,
     packageManager,
     manifest,
-    install: partial.install ?? true,
-    git: partial.git ?? true,
+    install,
+    git,
+    skills,
   };
 }
 

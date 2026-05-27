@@ -61,13 +61,20 @@ export interface ScaffoldOptions {
   packageManager?: PackageManager;
   providers: Provider[];
   resolveSpectrumTsVersion?: () => Promise<string>;
+  skills?: boolean;
+  skillsRunner?: SkillsRunner;
   targetDir: string;
 }
 
 export interface ScaffoldResult {
   needsEnvFile: boolean;
   spectrumTsVersion: string;
-  steps: { copied: true; installed: boolean; gitInitialized: boolean };
+  steps: {
+    copied: true;
+    installed: boolean;
+    skillsInstalled: boolean;
+    gitInitialized: boolean;
+  };
   targetDir: string;
 }
 
@@ -93,6 +100,13 @@ export class InstallError extends Error {
 }
 
 export const FALLBACK_SPECTRUM_TS_VERSION = "^0.0.0";
+
+const SPECTRUM_SKILL = "spectrum";
+
+export type SkillsRunner = (
+  args: readonly string[],
+  cwd: string
+) => Promise<number>;
 
 const MANIFEST_URL = "https://unpkg.com/spectrum-ts/manifest.json";
 
@@ -251,6 +265,18 @@ export async function scaffold(
     }
   }
 
+  // Kick off the skill install right after template copy so it runs
+  // concurrently with `pm install`. Awaited before git init so the resulting
+  // files land in the initial commit.
+  const skillsPromise =
+    options.skills !== false
+      ? trySkillsInstall(
+          targetDir,
+          options.skillsRunner ?? defaultSkillsRunner,
+          logger
+        )
+      : Promise.resolve(false);
+
   let installed = false;
   if (options.install !== false) {
     logger.step(`Running ${installCmd(pm)}…`);
@@ -258,6 +284,11 @@ export async function scaffold(
     await runInstall(pm, targetDir, logger);
     installed = true;
   }
+
+  if (options.skills !== false) {
+    logger.step("Installing Spectrum skill…");
+  }
+  const skillsInstalled = await skillsPromise;
 
   let gitInitialized = false;
   if (options.git !== false) {
@@ -270,7 +301,7 @@ export async function scaffold(
     targetDir,
     spectrumTsVersion,
     needsEnvFile: assembly.needsEnvFile,
-    steps: { copied: true, installed, gitInitialized },
+    steps: { copied: true, installed, skillsInstalled, gitInitialized },
   };
 }
 
@@ -361,8 +392,20 @@ function buildTokens(args: {
       assembly.topLevelEnvVars,
       assembly.providerEnvVars
     ),
+    // Agent-facing env section. Same copy for every provider that needs creds
+    // — only varies on present/absent, so a const + ternary, not a builder.
+    // The README path uses `envSetupBlock` (human-facing) instead.
+    envAgentBlock: assembly.needsEnvFile ? ENV_AGENT_BLOCK : "",
   };
 }
+
+const ENV_AGENT_BLOCK = `## Environment
+
+This project reads secrets from \`.env\` (gitignored). **Do not read, write, or echo \`.env\`** — it contains credentials.
+
+If startup fails with an authentication error, tell the user to verify their \`PROJECT_ID\` / \`PROJECT_SECRET\` at the [Photon dashboard](https://app.photon.codes).
+
+`;
 
 function buildEnvSetupBlock(top: string[], provider: string[]): string {
   if (top.length === 0 && provider.length === 0) {
@@ -480,3 +523,46 @@ async function tryGitInit(
     return false;
   }
 }
+
+async function trySkillsInstall(
+  cwd: string,
+  runner: SkillsRunner,
+  logger: ScaffoldLogger
+): Promise<boolean> {
+  try {
+    // Pre-create .claude/ so `skills add --agent '*'` creates the
+    // .claude/skills/spectrum symlink. Without this dir present at install
+    // time, the CLI only writes the universal .agents/skills/ path and
+    // Claude Code does not auto-discover the skill.
+    await mkdir(join(cwd, ".claude"), { recursive: true });
+    const args = [
+      "-y",
+      "skills",
+      "add",
+      "photon-hq/skills",
+      "--skill",
+      SPECTRUM_SKILL,
+      "--agent",
+      "*",
+      "-y",
+    ] as const;
+    const exit = await runner(args, cwd);
+    if (exit !== 0) {
+      logger.warn(`Spectrum skill install exited ${exit}; skipping.`);
+      return false;
+    }
+    return true;
+  } catch (err) {
+    logger.warn(
+      `Spectrum skill install unavailable: ${
+        err instanceof Error ? err.message : String(err)
+      }`
+    );
+    return false;
+  }
+}
+
+const defaultSkillsRunner: SkillsRunner = (args, cwd) => {
+  const runner = typeof process.versions.bun === "string" ? "bunx" : "npx";
+  return spawnExit(runner, args, { cwd });
+};
