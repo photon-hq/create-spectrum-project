@@ -5,13 +5,13 @@ Scaffolds a new [Spectrum](https://photon.codes/docs/spectrum-ts/introduction) p
 ## Interactive
 
 ```sh
-bunx create-spectrum-project my-app
+bun create spectrum-project@latest
 # or
-npm create spectrum-project@latest my-app
+npm create spectrum-project@latest
 # or
-pnpm create spectrum-project my-app
+pnpm create spectrum-project@latest
 # or
-yarn create spectrum-project my-app
+yarn create spectrum-project@latest
 ```
 
 You'll be asked for:
@@ -19,12 +19,13 @@ You'll be asked for:
 - Which interface (terminal sandbox, iMessage, or WhatsApp Business)
 - Your package manager (auto-detected)
 - Whether to install dependencies and initialize git
+- Whether to install the `spectrum` agent skill (default: yes)
 
-The generated project includes `src/index.ts` with the selected providers wired in, a `package.json` pinned to the current `spectrum-ts` release, a ready-to-fill `.env` (plus a tracked `.env.example`) for any required credentials, and an echo loop that runs on `bun start`.
+The generated project includes `src/index.ts` with the selected providers wired in, a `package.json` pinned to the current `spectrum-ts` release, an `AGENTS.md` + `CLAUDE.md` so AI coding agents have project context immediately, the `spectrum` skill from [`photon-hq/skills`](https://github.com/photon-hq/skills) installed locally, a ready-to-fill `.env` (plus a tracked `.env.example`) for any required credentials, and an echo loop that runs on `bun start`.
 
 ## Non-interactive
 
-Pass flags to skip prompts. Run `create-spectrum-project --help` for the full list.
+Pass flags to skip prompts. Run `bun create spectrum-project@latest --help` for the full list.
 
 ```
 Usage: create-spectrum-project [directory] [options]
@@ -34,6 +35,7 @@ Options:
   --pm <m>             bun | npm | pnpm | yarn (default: detected)
   --no-install         Skip dependency install
   --no-git             Skip git init
+  --no-skills          Skip Spectrum skill install
   -y, --yes            Use defaults; skip interactive prompts
   --verbose            Stream install stdout/stderr
   -h, --help           Show help
@@ -47,18 +49,19 @@ Defaults (applied by `-y` and as fallbacks for any flag you don't set):
 - Package manager: detected from your shell, otherwise `bun`
 - Install dependencies: yes
 - Initialize git: yes
+- Install Spectrum skill: yes
 
 Examples:
 
 ```sh
 # iMessage, no prompts, all defaults
-bunx create-spectrum-project -y
+bun create spectrum-project@latest -y
 
 # Terminal sandbox (dev TUI, no credentials)
-bunx create-spectrum-project my-app --providers terminal
+bun create spectrum-project@latest my-app --providers terminal
 
 # iMessage + WhatsApp on pnpm, skip git
-bunx create-spectrum-project my-app --providers imessage,whatsapp-business --pm pnpm --no-git
+bun create spectrum-project@latest my-app --providers imessage,whatsapp-business --pm pnpm --no-git
 ```
 
 ## Requirements
