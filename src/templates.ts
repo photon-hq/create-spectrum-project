@@ -106,9 +106,11 @@ export function templatesDir(): string {
 }
 
 export interface CopyTokens {
+  devScript: string;
   envAgentBlock: string;
   envBlock: string;
   envSetupBlock: string;
+  extraDevDeps: string;
   importsBlock: string;
   name: string;
   pmInstallCmd: string;
@@ -116,6 +118,8 @@ export interface CopyTokens {
   providersHuman: string;
   spectrumConfigBody: string;
   spectrumTsVersion: string;
+  startScript: string;
+  tsTypes: string;
 }
 
 /**
