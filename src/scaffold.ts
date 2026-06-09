@@ -379,6 +379,7 @@ function buildTokens(args: {
       envLines.push(`${k}=`);
     }
   }
+  const runtime = pmRuntimeTokens(pm);
   return {
     name,
     spectrumTsVersion,
@@ -388,6 +389,10 @@ function buildTokens(args: {
     providersHuman: assembly.providersHuman,
     pmInstallCmd: installCmd(pm),
     pmStartCmd: runScriptCmd(pm, "start"),
+    startScript: runtime.startScript,
+    devScript: runtime.devScript,
+    extraDevDeps: runtime.extraDevDeps,
+    tsTypes: runtime.tsTypes,
     envSetupBlock: buildEnvSetupBlock(
       assembly.topLevelEnvVars,
       assembly.providerEnvVars
@@ -396,6 +401,32 @@ function buildTokens(args: {
     // — only varies on present/absent, so a const + ternary, not a builder.
     // The README path uses `envSetupBlock` (human-facing) instead.
     envAgentBlock: assembly.needsEnvFile ? ENV_AGENT_BLOCK : "",
+  };
+}
+
+/**
+ * Per-package-manager bits that get embedded into package.json / tsconfig.json.
+ * Bun runs `.ts` directly; Node-based PMs need `tsx` to do the same.
+ */
+function pmRuntimeTokens(pm: PackageManager): {
+  startScript: string;
+  devScript: string;
+  extraDevDeps: string;
+  tsTypes: string;
+} {
+  if (pm === "bun") {
+    return {
+      startScript: "bun src/index.ts",
+      devScript: "bun --watch src/index.ts",
+      extraDevDeps: ',\n    "@types/bun": "latest"',
+      tsTypes: '"bun", "node"',
+    };
+  }
+  return {
+    startScript: "tsx src/index.ts",
+    devScript: "tsx watch src/index.ts",
+    extraDevDeps: ',\n    "@types/node": "^22",\n    "tsx": "^4"',
+    tsTypes: '"node"',
   };
 }
 

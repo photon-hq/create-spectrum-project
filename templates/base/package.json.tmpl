@@ -4,14 +4,13 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "start": "bun src/index.ts",
-    "dev": "bun --watch src/index.ts"
+    "start": "{{startScript}}",
+    "dev": "{{devScript}}"
   },
   "dependencies": {
     "spectrum-ts": "{{spectrumTsVersion}}"
   },
   "devDependencies": {
-    "typescript": "^5",
-    "@types/bun": "latest"
+    "typescript": "^5"{{extraDevDeps}}
   }
 }
