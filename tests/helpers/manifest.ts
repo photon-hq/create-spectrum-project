@@ -22,6 +22,12 @@ export const FIXTURE_MANIFEST: Manifest = [
     label: "Slack",
   },
   {
+    key: "telegram",
+    import: "telegram",
+    path: "spectrum-ts/providers/telegram",
+    label: "Telegram",
+  },
+  {
     key: "terminal",
     import: "terminal",
     path: "spectrum-ts/providers/terminal",

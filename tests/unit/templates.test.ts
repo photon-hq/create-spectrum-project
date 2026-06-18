@@ -102,6 +102,30 @@ describe("assembleProviders — whatsapp-business only", () => {
   });
 });
 
+describe("assembleProviders — telegram only", () => {
+  const r = assembleProviders(["telegram"], FIXTURE_MANIFEST);
+
+  test("imports telegram from telegram path", () => {
+    expect(r.importsBlock).toContain(
+      'import { telegram } from "spectrum-ts/providers/telegram";'
+    );
+  });
+
+  test("config call passes botToken from env", () => {
+    expect(r.spectrumConfigBody).toContain(
+      "telegram.config({ botToken: process.env.TELEGRAM_BOT_TOKEN! }),"
+    );
+  });
+
+  test("contributes TELEGRAM_BOT_TOKEN as a provider env var", () => {
+    expect(r.providerEnv.map((e) => e.name)).toEqual(["TELEGRAM_BOT_TOKEN"]);
+  });
+
+  test("needsEnvFile is true", () => {
+    expect(r.needsEnvFile).toBe(true);
+  });
+});
+
 describe("assembleProviders — imessage + whatsapp-business", () => {
   const r = assembleProviders(
     ["imessage", "whatsapp-business"],

@@ -1,7 +1,5 @@
 import { Spectrum } from "spectrum-ts";
-import { imessage } from "spectrum-ts/providers/imessage";
 import { telegram } from "spectrum-ts/providers/telegram";
-import { whatsappBusiness } from "spectrum-ts/providers/whatsapp-business";
 // Spectrum bridges a single agent loop to many messaging interfaces.
 // Each provider in `providers` adds an interface (terminal TUI, iMessage, …).
 // Docs: https://photon.codes/docs/spectrum-ts
@@ -9,12 +7,8 @@ const app = await Spectrum({
   projectId: process.env.PROJECT_ID!,
   projectSecret: process.env.PROJECT_SECRET!,
   providers: [
-    // iMessage
-    imessage.config(),
     // Telegram
     telegram.config({ botToken: process.env.TELEGRAM_BOT_TOKEN! }),
-    // WhatsApp Business
-    whatsappBusiness.config(),
   ],
 });
 

@@ -1,6 +1,6 @@
-# all-platforms
+# telegram-only
 
-A [Spectrum](https://photon.codes/docs/spectrum-ts) project. Wired with: iMessage, Telegram, WhatsApp Business.
+A [Spectrum](https://photon.codes/docs/spectrum-ts) project. Wired with: Telegram.
 
 ## Environment
 

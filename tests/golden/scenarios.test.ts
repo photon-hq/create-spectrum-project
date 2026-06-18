@@ -29,9 +29,14 @@ const SCENARIOS: Scenario[] = [
     expectedEnv: "PROJECT_ID=\nPROJECT_SECRET=",
   },
   {
+    name: "telegram-only",
+    providers: ["telegram"],
+    expectedEnv: "PROJECT_ID=\nPROJECT_SECRET=\nTELEGRAM_BOT_TOKEN=",
+  },
+  {
     name: "all-platforms",
-    providers: ["imessage", "whatsapp-business"],
-    expectedEnv: "PROJECT_ID=\nPROJECT_SECRET=",
+    providers: ["imessage", "telegram", "whatsapp-business"],
+    expectedEnv: "PROJECT_ID=\nPROJECT_SECRET=\nTELEGRAM_BOT_TOKEN=",
   },
 ];
 

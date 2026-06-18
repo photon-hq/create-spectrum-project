@@ -3,14 +3,49 @@ import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { type Manifest, type Provider, TERMINAL_KEY } from "./scaffold.ts";
 
+/** A provider-specific env var, with where to get it for .env / README copy. */
+export interface ProviderEnvVar {
+  /** Plain-text note for the .env comment, e.g. "Telegram bot token (from @BotFather)". */
+  comment: string;
+  /** Env var name, e.g. "TELEGRAM_BOT_TOKEN". */
+  name: string;
+  /** Markdown source for the README env-setup section, e.g. "[@BotFather](https://t.me/BotFather) on Telegram". */
+  source: string;
+}
+
 export interface ProviderAssembly {
   importsBlock: string;
   needsEnvFile: boolean;
-  providerEnvVars: string[];
+  providerEnv: ProviderEnvVar[];
   providersHuman: string;
   spectrumConfigBody: string;
   topLevelEnvVars: string[];
 }
+
+interface ProviderConfig {
+  /** Args rendered inside `.config({...})`. Empty → bare `.config()`. */
+  configArg: string;
+  /** The env var this provider's config reads. */
+  env: ProviderEnvVar;
+}
+
+/**
+ * Provider-specific `.config({...})` args and the env vars they read — detail
+ * the spectrum-ts manifest doesn't carry, so it's hardcoded by key here (same
+ * precedent as {@link TERMINAL_KEY}). Providers absent from this map emit a
+ * bare `.config()` and contribute no provider env vars; their credentials, if
+ * any, flow through the top-level Photon project secret.
+ */
+const PROVIDER_CONFIG: Record<string, ProviderConfig> = {
+  telegram: {
+    configArg: "{ botToken: process.env.TELEGRAM_BOT_TOKEN! }",
+    env: {
+      name: "TELEGRAM_BOT_TOKEN",
+      comment: "Telegram bot token (from @BotFather)",
+      source: "[@BotFather](https://t.me/BotFather) on Telegram",
+    },
+  },
+};
 
 export function assembleProviders(
   providers: Provider[],
@@ -51,12 +86,17 @@ export function assembleProviders(
   const imports = ['import { Spectrum } from "spectrum-ts";'];
   const providerLines: string[] = [];
   const humanParts: string[] = [];
+  const providerEnv: ProviderEnvVar[] = [];
 
   for (const meta of ordered) {
+    const cfg = PROVIDER_CONFIG[meta.key];
     imports.push(`import { ${meta.import} } from "${meta.path}";`);
     providerLines.push(`    // ${meta.label}`);
-    providerLines.push(`    ${meta.import}.config(),`);
+    providerLines.push(`    ${meta.import}.config(${cfg?.configArg ?? ""}),`);
     humanParts.push(meta.label);
+    if (cfg) {
+      providerEnv.push(cfg.env);
+    }
   }
 
   const importsBlock = imports.join("\n");
@@ -76,8 +116,8 @@ export function assembleProviders(
     importsBlock,
     spectrumConfigBody: configLines.join("\n"),
     topLevelEnvVars,
-    providerEnvVars: [],
-    needsEnvFile: hasPlatform,
+    providerEnv,
+    needsEnvFile: hasPlatform || providerEnv.length > 0,
     providersHuman: humanParts.join(", "),
   };
 }

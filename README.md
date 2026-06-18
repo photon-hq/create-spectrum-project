@@ -16,7 +16,7 @@ yarn create spectrum-project@latest
 
 You'll be asked for:
 
-- Which interface (terminal sandbox, iMessage, or WhatsApp Business)
+- Which interface (terminal sandbox, iMessage, Telegram, or WhatsApp Business)
 - Your package manager (auto-detected)
 - Whether to install dependencies and initialize git
 - Whether to install the `spectrum` agent skill (default: yes)
@@ -31,7 +31,7 @@ Pass flags to skip prompts. Run `bun create spectrum-project@latest --help` for 
 Usage: create-spectrum-project [directory] [options]
 
 Options:
-  --providers <list>   Comma-separated keys: terminal, imessage, whatsapp-business
+  --providers <list>   Comma-separated keys: terminal, imessage, telegram, whatsapp-business
   --pm <m>             bun | npm | pnpm | yarn (default: detected)
   --no-install         Skip dependency install
   --no-git             Skip git init
