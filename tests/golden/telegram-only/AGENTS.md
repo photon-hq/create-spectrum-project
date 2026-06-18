@@ -1,6 +1,6 @@
-# all-platforms — agent instructions
+# telegram-only — agent instructions
 
-This is a [Spectrum](https://photon.codes/docs/spectrum-ts) app, pinned to `spectrum-ts@^1.2.3`. The entry point is `src/index.ts`, which configures the iMessage, Telegram, WhatsApp Business provider(s) and runs the echo loop.
+This is a [Spectrum](https://photon.codes/docs/spectrum-ts) app, pinned to `spectrum-ts@^1.2.3`. The entry point is `src/index.ts`, which configures the Telegram provider(s) and runs the echo loop.
 
 ## Working in this project
 

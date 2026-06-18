@@ -18,6 +18,7 @@ import {
   assembleProviders,
   copyAndTransform,
   type ProviderAssembly,
+  type ProviderEnvVar,
   templatesDir,
 } from "./templates.ts";
 
@@ -127,6 +128,12 @@ export const FALLBACK_MANIFEST: Manifest = [
     import: "slack",
     path: "spectrum-ts/providers/slack",
     label: "Slack",
+  },
+  {
+    key: "telegram",
+    import: "telegram",
+    path: "spectrum-ts/providers/telegram",
+    label: "Telegram",
   },
   {
     key: "terminal",
@@ -241,20 +248,10 @@ export async function scaffold(
     });
 
     if (assembly.needsEnvFile) {
-      const envLines: string[] = [];
-      for (const k of assembly.topLevelEnvVars) {
-        if (k === "PROJECT_ID" && options.credentials) {
-          envLines.push(`PROJECT_ID=${options.credentials.projectId}`);
-        } else if (k === "PROJECT_SECRET" && options.credentials) {
-          envLines.push(`PROJECT_SECRET=${options.credentials.projectSecret}`);
-        } else {
-          envLines.push(`${k}=`);
-        }
-      }
-      for (const k of assembly.providerEnvVars) {
-        envLines.push(`${k}=`);
-      }
-      await writeFile(join(tmp, ".env"), envLines.join("\n"));
+      await writeFile(
+        join(tmp, ".env"),
+        buildEnvFile(assembly, options.credentials)
+      );
     }
 
     await rename(tmp, targetDir);
@@ -354,6 +351,31 @@ async function resolveVersion(
   }
 }
 
+/**
+ * The actual `.env` (not the tracked `.env.example`): real credentials filled
+ * in when we have them, blank placeholders otherwise. No comments — that's
+ * what `.env.example` carries.
+ */
+function buildEnvFile(
+  assembly: ProviderAssembly,
+  credentials: ScaffoldOptions["credentials"]
+): string {
+  const lines: string[] = [];
+  for (const k of assembly.topLevelEnvVars) {
+    if (k === "PROJECT_ID" && credentials) {
+      lines.push(`PROJECT_ID=${credentials.projectId}`);
+    } else if (k === "PROJECT_SECRET" && credentials) {
+      lines.push(`PROJECT_SECRET=${credentials.projectSecret}`);
+    } else {
+      lines.push(`${k}=`);
+    }
+  }
+  for (const e of assembly.providerEnv) {
+    lines.push(`${e.name}=`);
+  }
+  return lines.join("\n");
+}
+
 function buildTokens(args: {
   name: string;
   spectrumTsVersion: string;
@@ -370,13 +392,13 @@ function buildTokens(args: {
       envLines.push(`${k}=`);
     }
   }
-  if (assembly.providerEnvVars.length > 0) {
+  if (assembly.providerEnv.length > 0) {
     if (envLines.length > 0) {
       envLines.push("");
     }
-    envLines.push("# WhatsApp Business (from Meta for Developers).");
-    for (const k of assembly.providerEnvVars) {
-      envLines.push(`${k}=`);
+    for (const e of assembly.providerEnv) {
+      envLines.push(`# ${e.comment}.`);
+      envLines.push(`${e.name}=`);
     }
   }
   const runtime = pmRuntimeTokens(pm);
@@ -395,7 +417,7 @@ function buildTokens(args: {
     tsTypes: runtime.tsTypes,
     envSetupBlock: buildEnvSetupBlock(
       assembly.topLevelEnvVars,
-      assembly.providerEnvVars
+      assembly.providerEnv
     ),
     // Agent-facing env section. Same copy for every provider that needs creds
     // — only varies on present/absent, so a const + ternary, not a builder.
@@ -438,8 +460,11 @@ If startup fails with an authentication error, tell the user to verify their \`P
 
 `;
 
-function buildEnvSetupBlock(top: string[], provider: string[]): string {
-  if (top.length === 0 && provider.length === 0) {
+function buildEnvSetupBlock(
+  top: string[],
+  providerEnv: ProviderEnvVar[]
+): string {
+  if (top.length === 0 && providerEnv.length === 0) {
     return "";
   }
   const lines: string[] = [
@@ -458,14 +483,10 @@ function buildEnvSetupBlock(top: string[], provider: string[]): string {
     }
     lines.push("");
   }
-  if (provider.length > 0) {
-    lines.push(
-      "From [Meta for Developers](https://developers.facebook.com) (WhatsApp Business):"
-    );
+  for (const e of providerEnv) {
+    lines.push(`From ${e.source}:`);
     lines.push("");
-    for (const k of provider) {
-      lines.push(`- \`${k}\``);
-    }
+    lines.push(`- \`${e.name}\``);
     lines.push("");
   }
   return `${lines.join("\n")}\n`;
