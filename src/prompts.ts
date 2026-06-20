@@ -5,6 +5,7 @@ import type { Manifest, Provider, ScaffoldOptions } from "./scaffold.ts";
 import { TERMINAL_KEY } from "./scaffold.ts";
 
 export interface PartialOptions {
+  cloud?: boolean;
   git?: boolean;
   install?: boolean;
   packageManager?: PackageManager;
@@ -13,6 +14,8 @@ export interface PartialOptions {
   targetDir?: string;
 }
 
+export type PromptResult = ScaffoldOptions & { provisionCloud: boolean };
+
 const onCancel = () => {
   process.stderr.write(`\n${pc.dim("Cancelled.")}\n`);
   process.exit(130);
@@ -20,8 +23,8 @@ const onCancel = () => {
 
 export async function promptForOptions(
   partial: PartialOptions,
-  manifest: Manifest
-): Promise<ScaffoldOptions> {
+  manifest: Manifest,
+): Promise<PromptResult> {
   const targetDir =
     partial.targetDir ??
     (
@@ -32,11 +35,13 @@ export async function promptForOptions(
           message: "Project directory",
           initial: "my-spectrum-app",
         },
-        { onCancel }
+        { onCancel },
       )
     ).value;
 
   const providers = partial.providers ?? (await askProviders(manifest));
+
+  const provisionCloud = await askSetUpCloud(providers, partial);
 
   const detected = detectPm() ?? "bun";
   const pmChoices: PackageManager[] = ["bun", "npm", "pnpm", "yarn"];
@@ -51,7 +56,7 @@ export async function promptForOptions(
           choices: pmChoices.map((p) => ({ title: p, value: p })),
           initial: pmChoices.indexOf(detected),
         },
-        { onCancel }
+        { onCancel },
       )
     ).value;
 
@@ -68,7 +73,7 @@ export async function promptForOptions(
           message: "Install dependencies?",
           initial: true,
         },
-        { onCancel }
+        { onCancel },
       )
     ).value;
 
@@ -82,7 +87,7 @@ export async function promptForOptions(
           message: "Install Spectrum skill for AI agents?",
           initial: true,
         },
-        { onCancel }
+        { onCancel },
       )
     ).value;
 
@@ -96,7 +101,7 @@ export async function promptForOptions(
           message: "Initialize git?",
           initial: true,
         },
-        { onCancel }
+        { onCancel },
       )
     ).value;
 
@@ -108,7 +113,37 @@ export async function promptForOptions(
     install,
     git,
     skills,
+    provisionCloud,
   };
+}
+
+/** Provider whose only credentials are the top-level Spectrum Cloud project
+ * secret, so the whole project can be provisioned online and written to .env. */
+const IMESSAGE_KEY = "imessage";
+
+/**
+ * Offer to set up Spectrum Cloud — create the project online and fill in .env.
+ * Only offered when iMessage is selected (its credentials are just the project
+ * secret); `--no-cloud` opts out. Returns false (no offer) otherwise.
+ */
+async function askSetUpCloud(
+  providers: Provider[],
+  partial: PartialOptions,
+): Promise<boolean> {
+  if (!providers.includes(IMESSAGE_KEY) || partial.cloud === false) {
+    return false;
+  }
+  const { value } = await prompts(
+    {
+      type: "confirm",
+      name: "value",
+      message:
+        "Set up Spectrum Cloud now? (creates your project and fills in .env)",
+      initial: true,
+    },
+    { onCancel },
+  );
+  return value;
 }
 
 async function askProviders(manifest: Manifest): Promise<Provider[]> {
@@ -146,7 +181,7 @@ async function askProviders(manifest: Manifest): Promise<Provider[]> {
       ],
       initial: 0,
     },
-    { onCancel }
+    { onCancel },
   );
 
   if (kind === "terminal") {
@@ -156,7 +191,7 @@ async function askProviders(manifest: Manifest): Promise<Provider[]> {
 }
 
 async function askPlatformProviders(
-  platformProviders: Manifest
+  platformProviders: Manifest,
 ): Promise<Provider[]> {
   const { values } = await prompts(
     {
@@ -171,7 +206,7 @@ async function askPlatformProviders(
       })),
       min: 1,
     },
-    { onCancel }
+    { onCancel },
   );
   return values as Provider[];
 }
