@@ -21,22 +21,22 @@ const SCENARIOS: Scenario[] = [
   {
     name: "imessage",
     providers: ["imessage"],
-    expectedEnv: "PROJECT_ID=\nPROJECT_SECRET=",
+    expectedEnv: "PROJECT_ID=\nPROJECT_SECRET=\n",
   },
   {
     name: "whatsapp-only",
     providers: ["whatsapp-business"],
-    expectedEnv: "PROJECT_ID=\nPROJECT_SECRET=",
+    expectedEnv: "PROJECT_ID=\nPROJECT_SECRET=\n",
   },
   {
     name: "telegram-only",
     providers: ["telegram"],
-    expectedEnv: "PROJECT_ID=\nPROJECT_SECRET=\nTELEGRAM_BOT_TOKEN=",
+    expectedEnv: "PROJECT_ID=\nPROJECT_SECRET=\nTELEGRAM_BOT_TOKEN=\n",
   },
   {
     name: "all-platforms",
     providers: ["imessage", "telegram", "whatsapp-business"],
-    expectedEnv: "PROJECT_ID=\nPROJECT_SECRET=\nTELEGRAM_BOT_TOKEN=",
+    expectedEnv: "PROJECT_ID=\nPROJECT_SECRET=\nTELEGRAM_BOT_TOKEN=\n",
   },
 ];
 
