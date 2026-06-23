@@ -28,6 +28,31 @@ const NOOP_LOGGER: CloudLogger = {
   warn: (msg) => process.stderr.write(`warn: ${msg}\n`),
 };
 
+/**
+ * Maps this CLI's provider keys to the Spectrum Cloud platform names accepted
+ * by `projects create --platforms` (`imessage`, `whatsapp_business`, `voice`).
+ * Only cloud-managed platforms appear here.
+ */
+const CLOUD_PLATFORM_BY_PROVIDER: Record<string, string> = {
+  imessage: "imessage",
+  "whatsapp-business": "whatsapp_business",
+};
+
+/**
+ * Resolve selected provider keys to the deduped, order-preserving list of
+ * Spectrum Cloud platform names to enable on the new project.
+ */
+export function cloudPlatformsFor(providers: readonly string[]): string[] {
+  const platforms: string[] = [];
+  for (const provider of providers) {
+    const platform = CLOUD_PLATFORM_BY_PROVIDER[provider];
+    if (platform && !platforms.includes(platform)) {
+      platforms.push(platform);
+    }
+  }
+  return platforms;
+}
+
 function spawnPhoton(
   cmd: string,
   args: readonly string[],
@@ -106,10 +131,12 @@ function parseField(
 /**
  * Set up a Spectrum Cloud project and return its credentials, ready to be
  * written into the scaffold's `.env`. Authenticates inline (running `photon
- * login` if needed), creates an iMessage project, then mints its secret.
+ * login` if needed), creates the project enabling `opts.platforms`, then mints
+ * its secret. Pass an empty `platforms` to create a project with no managed
+ * platform (e.g. a Slack/Telegram-only scaffold that just needs the secret).
  */
 export async function provisionSpectrumProject(
-  opts: { name: string },
+  opts: { name: string; platforms: readonly string[] },
   deps: ProvisionDeps = {},
 ): Promise<SpectrumCredentials | null> {
   const logger = deps.logger ?? NOOP_LOGGER;
@@ -129,21 +156,17 @@ export async function provisionSpectrumProject(
     }
 
     logger.step("Creating your Spectrum Cloud project…");
-    const created = await run(
-      [
-        "projects",
-        "create",
-        "--name",
-        opts.name,
-        "--platforms",
-        "imessage",
-        "--json",
-      ],
-      { capture: true },
-    );
+    const createArgs = ["projects", "create", "--name", opts.name];
+    if (opts.platforms.length > 0) {
+      createArgs.push("--platforms", opts.platforms.join(","));
+    }
+    createArgs.push("--json");
+    const created = await run(createArgs, { capture: true });
     const projectId = parseField(created, "id");
     if (!projectId) {
-      return bail("Could not create the Spectrum Cloud project; skipping setup.");
+      return bail(
+        "Could not create the Spectrum Cloud project; skipping setup.",
+      );
     }
 
     logger.step("Generating project secret…");

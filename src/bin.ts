@@ -4,7 +4,10 @@ import { basename, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import pc from "picocolors";
-import { provisionSpectrumProject } from "./spectrum-cloud.ts";
+import {
+  cloudPlatformsFor,
+  provisionSpectrumProject,
+} from "./spectrum-cloud.ts";
 import { isPm, type PackageManager } from "./pm.ts";
 import { type PartialOptions, promptForOptions } from "./prompts.ts";
 import {
@@ -107,7 +110,10 @@ async function main(): Promise<number> {
   // Set up Spectrum Cloud before the spinner starts
   const credentials = opts.provisionCloud
     ? ((await provisionSpectrumProject(
-        { name: basename(resolve(opts.targetDir)) },
+        {
+          name: basename(resolve(opts.targetDir)),
+          platforms: cloudPlatformsFor(opts.providers),
+        },
         {
           logger: {
             step: (msg) => process.stdout.write(`${SYM.arrow} ${msg}\n`),
