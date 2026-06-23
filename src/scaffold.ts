@@ -69,6 +69,12 @@ export interface ScaffoldOptions {
 
 export interface ScaffoldResult {
   needsEnvFile: boolean;
+  /**
+   * Whether the .env has provider-specific vars (e.g. TELEGRAM_BOT_TOKEN) that
+   * cloud provisioning can't fill — it only supplies PROJECT_ID/PROJECT_SECRET.
+   * Drives whether the "fill in .env" reminder is still needed after provisioning.
+   */
+  hasProviderEnvVars: boolean;
   spectrumTsVersion: string;
   steps: {
     copied: true;
@@ -106,7 +112,7 @@ const SPECTRUM_SKILL = "spectrum";
 
 export type SkillsRunner = (
   args: readonly string[],
-  cwd: string
+  cwd: string,
 ) => Promise<number>;
 
 const MANIFEST_URL = "https://unpkg.com/spectrum-ts/manifest.json";
@@ -171,7 +177,7 @@ function isManifestEntry(value: unknown): value is ManifestEntry {
  * same manifest into prompts and scaffold without duplicate network calls.
  */
 export async function fetchManifest(
-  logger?: ScaffoldLogger
+  logger?: ScaffoldLogger,
 ): Promise<Manifest> {
   try {
     const res = await fetch(MANIFEST_URL, {
@@ -194,7 +200,7 @@ export async function fetchManifest(
     logger?.warn(
       `Could not fetch spectrum-ts manifest from ${MANIFEST_URL} (${
         err instanceof Error ? err.message : String(err)
-      }); using bundled fallback (${FALLBACK_MANIFEST.length} providers).`
+      }); using bundled fallback (${FALLBACK_MANIFEST.length} providers).`,
     );
     return FALLBACK_MANIFEST;
   }
@@ -207,7 +213,7 @@ const NOOP_LOGGER: ScaffoldLogger = {
 };
 
 export async function scaffold(
-  options: ScaffoldOptions
+  options: ScaffoldOptions,
 ): Promise<ScaffoldResult> {
   const logger = options.logger ?? NOOP_LOGGER;
   if (options.providers.length === 0) {
@@ -227,7 +233,7 @@ export async function scaffold(
   logger.step("Resolving spectrum-ts version…");
   const spectrumTsVersion = await resolveVersion(
     options.resolveSpectrumTsVersion,
-    logger
+    logger,
   );
 
   const assembly = assembleProviders(options.providers, options.manifest);
@@ -250,7 +256,7 @@ export async function scaffold(
     if (assembly.needsEnvFile) {
       await writeFile(
         join(tmp, ".env"),
-        buildEnvFile(assembly, options.credentials)
+        buildEnvFile(assembly, options.credentials),
       );
     }
 
@@ -270,7 +276,7 @@ export async function scaffold(
       ? trySkillsInstall(
           targetDir,
           options.skillsRunner ?? defaultSkillsRunner,
-          logger
+          logger,
         )
       : Promise.resolve(false);
 
@@ -298,6 +304,7 @@ export async function scaffold(
     targetDir,
     spectrumTsVersion,
     needsEnvFile: assembly.needsEnvFile,
+    hasProviderEnvVars: assembly.providerEnv.length > 0,
     steps: { copied: true, installed, skillsInstalled, gitInitialized },
   };
 }
@@ -318,7 +325,7 @@ const NPM_REGISTRY = "https://registry.npmjs.org/spectrum-ts";
 
 async function resolveVersion(
   override: (() => Promise<string>) | undefined,
-  logger: ScaffoldLogger
+  logger: ScaffoldLogger,
 ): Promise<string> {
   try {
     if (override) {
@@ -340,11 +347,11 @@ async function resolveVersion(
     logger.warn(
       `Could not resolve spectrum-ts version from npm (${
         err instanceof Error ? err.message : String(err)
-      }); using bundled fallback ${FALLBACK_SPECTRUM_TS_VERSION}.`
+      }); using bundled fallback ${FALLBACK_SPECTRUM_TS_VERSION}.`,
     );
     if (!FALLBACK_SPECTRUM_TS_VERSION) {
       throw new VersionResolutionError(
-        "No spectrum-ts fallback version available"
+        "No spectrum-ts fallback version available",
       );
     }
     return FALLBACK_SPECTRUM_TS_VERSION;
@@ -358,7 +365,7 @@ async function resolveVersion(
  */
 function buildEnvFile(
   assembly: ProviderAssembly,
-  credentials: ScaffoldOptions["credentials"]
+  credentials: ScaffoldOptions["credentials"],
 ): string {
   const lines: string[] = [];
   for (const k of assembly.topLevelEnvVars) {
@@ -373,7 +380,8 @@ function buildEnvFile(
   for (const e of assembly.providerEnv) {
     lines.push(`${e.name}=`);
   }
-  return lines.join("\n");
+
+  return `${lines.join("\n")}\n`;
 }
 
 function buildTokens(args: {
@@ -386,7 +394,7 @@ function buildTokens(args: {
   const envLines: string[] = [];
   if (assembly.topLevelEnvVars.length > 0) {
     envLines.push(
-      "# Top-level Spectrum credentials (from your Photon dashboard)."
+      "# Top-level Spectrum credentials (from your Photon dashboard).",
     );
     for (const k of assembly.topLevelEnvVars) {
       envLines.push(`${k}=`);
@@ -417,7 +425,7 @@ function buildTokens(args: {
     tsTypes: runtime.tsTypes,
     envSetupBlock: buildEnvSetupBlock(
       assembly.topLevelEnvVars,
-      assembly.providerEnv
+      assembly.providerEnv,
     ),
     // Agent-facing env section. Same copy for every provider that needs creds
     // — only varies on present/absent, so a const + ternary, not a builder.
@@ -462,7 +470,7 @@ If startup fails with an authentication error, tell the user to verify their \`P
 
 function buildEnvSetupBlock(
   top: string[],
-  providerEnv: ProviderEnvVar[]
+  providerEnv: ProviderEnvVar[],
 ): string {
   if (top.length === 0 && providerEnv.length === 0) {
     return "";
@@ -475,7 +483,7 @@ function buildEnvSetupBlock(
   ];
   if (top.length > 0) {
     lines.push(
-      "From your project Settings on the [Photon dashboard](https://app.photon.codes):"
+      "From your project Settings on the [Photon dashboard](https://app.photon.codes):",
     );
     lines.push("");
     for (const k of top) {
@@ -496,7 +504,7 @@ function spawnExit(
   command: string,
   args: readonly string[],
   opts: SpawnOptions,
-  onChunk?: (s: string) => void
+  onChunk?: (s: string) => void,
 ): Promise<number> {
   return new Promise((resolveExit, rejectSpawn) => {
     const stdio: SpawnOptions["stdio"] = onChunk
@@ -517,23 +525,23 @@ function spawnExit(
 async function runInstall(
   pm: PackageManager,
   cwd: string,
-  logger: ScaffoldLogger
+  logger: ScaffoldLogger,
 ): Promise<void> {
   const args = pm === "yarn" ? [] : ["install"];
   const exitCode = await spawnExit(pm, args, { cwd }, (chunk) =>
-    logger.stream(chunk)
+    logger.stream(chunk),
   );
   if (exitCode !== 0) {
     throw new InstallError(
       `\`${pm} ${args.join(" ")}\` exited with code ${exitCode}`,
-      exitCode
+      exitCode,
     );
   }
 }
 
 async function tryGitInit(
   cwd: string,
-  logger: ScaffoldLogger
+  logger: ScaffoldLogger,
 ): Promise<boolean> {
   try {
     if ((await spawnExit("git", ["init", "-b", "main"], { cwd })) !== 0) {
@@ -561,7 +569,7 @@ async function tryGitInit(
         "Initial commit from create-spectrum-project",
         "--no-verify",
       ],
-      { cwd, env: commitEnv }
+      { cwd, env: commitEnv },
     );
     if (commitExit !== 0) {
       logger.warn("git commit failed; repo initialized but no initial commit.");
@@ -570,7 +578,7 @@ async function tryGitInit(
     return true;
   } catch (err) {
     logger.warn(
-      `git not available: ${err instanceof Error ? err.message : String(err)}`
+      `git not available: ${err instanceof Error ? err.message : String(err)}`,
     );
     return false;
   }
@@ -579,14 +587,19 @@ async function tryGitInit(
 async function trySkillsInstall(
   cwd: string,
   runner: SkillsRunner,
-  logger: ScaffoldLogger
+  logger: ScaffoldLogger,
 ): Promise<boolean> {
   try {
-    // Pre-create .claude/ so `skills add --agent '*'` creates the
+    // Pre-create .claude/ so the `claude-code` agent gets a
     // .claude/skills/spectrum symlink. Without this dir present at install
     // time, the CLI only writes the universal .agents/skills/ path and
     // Claude Code does not auto-discover the skill.
     await mkdir(join(cwd, ".claude"), { recursive: true });
+    // Install only into the universal (.agents/skills) and Claude Code
+    // (.claude/skills) directories. Using `--agent '*'` would fan out to
+    // every agent in the registry, including ones nobody here uses — e.g.
+    // Eve, whose skills dir is a bare `agent/skills`, leaving a stray
+    // `agent/` folder in every scaffolded repo.
     const args = [
       "-y",
       "skills",
@@ -594,8 +607,8 @@ async function trySkillsInstall(
       "photon-hq/skills",
       "--skill",
       SPECTRUM_SKILL,
-      "--agent",
-      "*",
+      "-a",
+      "universal",
       "-y",
     ] as const;
     const exit = await runner(args, cwd);
@@ -608,7 +621,7 @@ async function trySkillsInstall(
     logger.warn(
       `Spectrum skill install unavailable: ${
         err instanceof Error ? err.message : String(err)
-      }`
+      }`,
     );
     return false;
   }

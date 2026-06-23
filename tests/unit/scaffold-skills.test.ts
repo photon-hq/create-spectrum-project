@@ -33,8 +33,8 @@ describe("scaffold — skills install", () => {
         "photon-hq/skills",
         "--skill",
         "spectrum",
-        "--agent",
-        "*",
+        "-a",
+        "universal",
         "-y",
       ]);
       expect(calls[0]?.cwd).toBe(result.targetDir);
@@ -106,7 +106,7 @@ describe("scaffold — skills install", () => {
       });
       expect(result.steps.skillsInstalled).toBe(false);
       expect(
-        logger.warnings.some((w) => w.toLowerCase().includes("skill"))
+        logger.warnings.some((w) => w.toLowerCase().includes("skill")),
       ).toBe(true);
     });
   });
@@ -128,7 +128,7 @@ describe("scaffold — skills install", () => {
       });
       expect(result.steps.skillsInstalled).toBe(false);
       expect(logger.warnings.some((w) => w.includes("npx unavailable"))).toBe(
-        true
+        true,
       );
     });
   });

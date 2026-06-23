@@ -1,9 +1,10 @@
 #!/usr/bin/env node
 import { readFile } from "node:fs/promises";
-import { basename } from "node:path";
+import { basename, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import pc from "picocolors";
+import { provisionSpectrumProject } from "./spectrum-cloud.ts";
 import { isPm, type PackageManager } from "./pm.ts";
 import { type PartialOptions, promptForOptions } from "./prompts.ts";
 import {
@@ -50,6 +51,7 @@ async function main(): Promise<number> {
       git: { type: "boolean", default: true },
       "no-git": { type: "boolean" },
       "no-skills": { type: "boolean" },
+      "no-cloud": { type: "boolean" },
       yes: { type: "boolean", short: "y" },
       verbose: { type: "boolean" },
       help: { type: "boolean", short: "h" },
@@ -71,7 +73,7 @@ async function main(): Promise<number> {
   }
 
   process.stdout.write(
-    `\n${pc.bold("create-spectrum-project")} ${pc.dim(`v${version}`)}\n\n`
+    `\n${pc.bold("create-spectrum-project")} ${pc.dim(`v${version}`)}\n\n`,
   );
 
   // Fetch the live provider list before prompts or flag validation can run,
@@ -102,12 +104,26 @@ async function main(): Promise<number> {
     process.stdout.write("\n");
   }
 
+  // Set up Spectrum Cloud before the spinner starts
+  const credentials = opts.provisionCloud
+    ? ((await provisionSpectrumProject(
+        { name: basename(resolve(opts.targetDir)) },
+        {
+          logger: {
+            step: (msg) => process.stdout.write(`${SYM.arrow} ${msg}\n`),
+            warn: (msg) => process.stderr.write(`${pc.yellow("!")} ${msg}\n`),
+          },
+        },
+      )) ?? undefined)
+    : undefined;
+
   const start = Date.now();
   const spin = startSpinner();
   let result: Awaited<ReturnType<typeof scaffold>>;
   try {
     result = await scaffold({
       ...opts,
+      credentials,
       manifest: fullManifest,
       logger: {
         step: (msg) => spin.text(msg),
@@ -131,12 +147,12 @@ async function main(): Promise<number> {
   }
   const seconds = ((Date.now() - start) / 1000).toFixed(1);
   spin.stop(
-    `${SYM.ok} Created ${pc.cyan(basename(result.targetDir))} ${SYM.dot} ${pc.bold(`spectrum-ts ${result.spectrumTsVersion}`)} ${pc.dim(`(${seconds}s)`)}`
+    `${SYM.ok} Created ${pc.cyan(basename(result.targetDir))} ${SYM.dot} ${pc.bold(`spectrum-ts ${result.spectrumTsVersion}`)} ${pc.dim(`(${seconds}s)`)}`,
   );
 
-  printNextSteps(result, opts);
+  printNextSteps(result, opts, credentials !== undefined);
   process.stdout.write(
-    `\n${SYM.arrow} ${pc.dim("Docs:")} ${pc.cyan("https://photon.codes/docs/spectrum-ts")}\n\n`
+    `\n${SYM.arrow} ${pc.dim("Docs:")} ${pc.cyan("https://photon.codes/docs/spectrum-ts")}\n\n`,
   );
   return 0;
 }
@@ -144,7 +160,7 @@ async function main(): Promise<number> {
 function collectFlagOptions(
   values: Record<string, unknown>,
   positionals: string[],
-  manifest: Manifest
+  manifest: Manifest,
 ): PartialOptions {
   const partial: PartialOptions = {};
   if (positionals[0]) {
@@ -168,6 +184,9 @@ function collectFlagOptions(
   if (values["no-skills"]) {
     partial.skills = false;
   }
+  if (values["no-cloud"]) {
+    partial.cloud = false;
+  }
   return partial;
 }
 
@@ -187,7 +206,7 @@ function parseProviders(raw: string, manifest: Manifest): Provider[] {
   }
   if (parts.includes(TERMINAL_KEY) && parts.length > 1) {
     fail(
-      `${TERMINAL_KEY} is a dev-only TUI and can't be mixed with platform providers. Pick ${TERMINAL_KEY} on its own, or pick one or more of: ${validKeys.filter((k) => k !== TERMINAL_KEY).join(", ")}.`
+      `${TERMINAL_KEY} is a dev-only TUI and can't be mixed with platform providers. Pick ${TERMINAL_KEY} on its own, or pick one or more of: ${validKeys.filter((k) => k !== TERMINAL_KEY).join(", ")}.`,
     );
   }
   return parts;
@@ -209,12 +228,19 @@ function fillDefaults(partial: PartialOptions, manifest: Manifest) {
     install: partial.install ?? true,
     git: partial.git ?? true,
     skills: partial.skills ?? true,
-  } satisfies PartialOptions & { targetDir: string; providers: Provider[] };
+    // Cloud setup needs an interactive login; the -y path is unattended.
+    provisionCloud: false,
+  } satisfies PartialOptions & {
+    targetDir: string;
+    providers: Provider[];
+    provisionCloud: boolean;
+  };
 }
 
 function printNextSteps(
   result: {
     needsEnvFile: boolean;
+    hasProviderEnvVars: boolean;
     steps: {
       installed: boolean;
       skillsInstalled: boolean;
@@ -222,7 +248,8 @@ function printNextSteps(
     };
     targetDir: string;
   },
-  opts: { packageManager?: PackageManager; skills?: boolean }
+  opts: { packageManager?: PackageManager; skills?: boolean },
+  credentialsWritten: boolean,
 ): void {
   const pm = opts.packageManager ?? "bun";
   const cwd = basename(result.targetDir);
@@ -232,7 +259,11 @@ function printNextSteps(
   if (!result.steps.installed) {
     steps.push({ cmd: pm === "yarn" ? "yarn" : `${pm} install` });
   }
-  if (result.needsEnvFile) {
+  // Provisioning only fills PROJECT_ID/PROJECT_SECRET, so provider-specific
+  // vars (e.g. TELEGRAM_BOT_TOKEN) stay blank even when credentials were
+  // written. Only suppress the reminder when nothing is left to fill in.
+  const envFullyProvisioned = credentialsWritten && !result.hasProviderEnvVars;
+  if (result.needsEnvFile && !envFullyProvisioned) {
     steps.push({ note: "fill in .env with your credentials" });
   }
   steps.push({ cmd: pm === "npm" ? "npm run start" : `${pm} start` });
@@ -296,7 +327,7 @@ function startSpinner(): Spinner {
       return;
     }
     process.stderr.write(
-      `\r\x1b[K${pc.dim(frames[i++ % frames.length])} ${msg}`
+      `\r\x1b[K${pc.dim(frames[i++ % frames.length])} ${msg}`,
     );
   };
   const interval = setInterval(render, 80);
@@ -340,6 +371,7 @@ function printHelp(): void {
     [pad(flag("--no-install")), "Skip dependency install"],
     [pad(flag("--no-git")), "Skip git init"],
     [pad(flag("--no-skills")), "Skip Spectrum skill install"],
+    [pad(flag("--no-cloud")), "Skip Spectrum Cloud project setup"],
     [
       pad(`${flag("-y")}, ${flag("--yes")}`),
       "Use defaults; skip interactive prompts",
@@ -357,7 +389,7 @@ function printHelp(): void {
       `  ${pc.bold("Options")}`,
       ...rows.map(([k, v]) => `    ${k}${dim(v)}`),
       "",
-    ].join("\n")
+    ].join("\n"),
   );
 }
 
@@ -386,7 +418,7 @@ try {
     process.exitCode = 1;
   } else if (err instanceof InstallError) {
     process.stderr.write(
-      `\n${SYM.err} Install failed (exit ${err.exitCode}). cd into the project and run install manually to retry.\n`
+      `\n${SYM.err} Install failed (exit ${err.exitCode}). cd into the project and run install manually to retry.\n`,
     );
     process.exitCode = 1;
   } else if (err instanceof VersionResolutionError) {
