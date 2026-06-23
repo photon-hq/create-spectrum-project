@@ -69,6 +69,12 @@ export interface ScaffoldOptions {
 
 export interface ScaffoldResult {
   needsEnvFile: boolean;
+  /**
+   * Whether the .env has provider-specific vars (e.g. TELEGRAM_BOT_TOKEN) that
+   * cloud provisioning can't fill — it only supplies PROJECT_ID/PROJECT_SECRET.
+   * Drives whether the "fill in .env" reminder is still needed after provisioning.
+   */
+  hasProviderEnvVars: boolean;
   spectrumTsVersion: string;
   steps: {
     copied: true;
@@ -298,6 +304,7 @@ export async function scaffold(
     targetDir,
     spectrumTsVersion,
     needsEnvFile: assembly.needsEnvFile,
+    hasProviderEnvVars: assembly.providerEnv.length > 0,
     steps: { copied: true, installed, skillsInstalled, gitInitialized },
   };
 }

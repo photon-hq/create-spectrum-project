@@ -240,6 +240,7 @@ function fillDefaults(partial: PartialOptions, manifest: Manifest) {
 function printNextSteps(
   result: {
     needsEnvFile: boolean;
+    hasProviderEnvVars: boolean;
     steps: {
       installed: boolean;
       skillsInstalled: boolean;
@@ -258,7 +259,11 @@ function printNextSteps(
   if (!result.steps.installed) {
     steps.push({ cmd: pm === "yarn" ? "yarn" : `${pm} install` });
   }
-  if (result.needsEnvFile && !credentialsWritten) {
+  // Provisioning only fills PROJECT_ID/PROJECT_SECRET, so provider-specific
+  // vars (e.g. TELEGRAM_BOT_TOKEN) stay blank even when credentials were
+  // written. Only suppress the reminder when nothing is left to fill in.
+  const envFullyProvisioned = credentialsWritten && !result.hasProviderEnvVars;
+  if (result.needsEnvFile && !envFullyProvisioned) {
     steps.push({ note: "fill in .env with your credentials" });
   }
   steps.push({ cmd: pm === "npm" ? "npm run start" : `${pm} start` });
