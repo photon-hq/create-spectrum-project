@@ -583,11 +583,16 @@ async function trySkillsInstall(
   logger: ScaffoldLogger,
 ): Promise<boolean> {
   try {
-    // Pre-create .claude/ so `skills add --agent '*'` creates the
+    // Pre-create .claude/ so the `claude-code` agent gets a
     // .claude/skills/spectrum symlink. Without this dir present at install
     // time, the CLI only writes the universal .agents/skills/ path and
     // Claude Code does not auto-discover the skill.
     await mkdir(join(cwd, ".claude"), { recursive: true });
+    // Install only into the universal (.agents/skills) and Claude Code
+    // (.claude/skills) directories. Using `--agent '*'` would fan out to
+    // every agent in the registry, including ones nobody here uses — e.g.
+    // Eve, whose skills dir is a bare `agent/skills`, leaving a stray
+    // `agent/` folder in every scaffolded repo.
     const args = [
       "-y",
       "skills",
@@ -595,8 +600,8 @@ async function trySkillsInstall(
       "photon-hq/skills",
       "--skill",
       SPECTRUM_SKILL,
-      "--agent",
-      "*",
+      "-a",
+      "universal",
       "-y",
     ] as const;
     const exit = await runner(args, cwd);
