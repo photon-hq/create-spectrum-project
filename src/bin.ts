@@ -230,7 +230,7 @@ function parseProviders(raw: string, manifest: Manifest): Provider[] {
     }
   }
   if (parts.length === 0) {
-    fail("--providers must list at least one provider");
+    fail("--platforms must list at least one provider");
   }
   if (parts.includes(TERMINAL_KEY) && parts.length > 1) {
     fail(
