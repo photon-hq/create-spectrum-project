@@ -29,25 +29,15 @@ const NOOP_LOGGER: CloudLogger = {
 };
 
 /**
- * Maps this CLI's provider keys to the Spectrum Cloud platform names accepted
- * by `projects create --platforms` (`imessage`, `whatsapp_business`, `voice`).
- * Only cloud-managed platforms appear here.
- */
-const CLOUD_PLATFORM_BY_PROVIDER: Record<string, string> = {
-  imessage: "imessage",
-  "whatsapp-business": "whatsapp_business",
-};
-
-/**
  * Resolve selected provider keys to the deduped, order-preserving list of
- * Spectrum Cloud platform names to enable on the new project.
+ * Spectrum Cloud platform names accepted by `projects create --platforms`.
  */
 export function cloudPlatformsFor(providers: readonly string[]): string[] {
   const platforms: string[] = [];
   for (const provider of providers) {
-    const platform = CLOUD_PLATFORM_BY_PROVIDER[provider];
-    if (platform && !platforms.includes(platform)) {
-      platforms.push(platform);
+    const platformNormalized = provider.replace(/-/g, "_");
+    if (!platforms.includes(platformNormalized)) {
+      platforms.push(platformNormalized);
     }
   }
   return platforms;

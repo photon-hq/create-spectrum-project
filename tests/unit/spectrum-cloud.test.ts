@@ -189,7 +189,7 @@ describe("provisionSpectrumProject", () => {
 });
 
 describe("cloudPlatformsFor", () => {
-  test("maps cloud-managed provider keys to platform names", () => {
+  test("normalizes dashes to underscores", () => {
     expect(cloudPlatformsFor(["imessage"])).toEqual(["imessage"]);
     expect(cloudPlatformsFor(["whatsapp-business"])).toEqual([
       "whatsapp_business",
@@ -200,9 +200,11 @@ describe("cloudPlatformsFor", () => {
     ]);
   });
 
-  test("drops self-hosted bot providers with no managed platform", () => {
-    expect(cloudPlatformsFor(["slack", "telegram"])).toEqual([]);
-    expect(cloudPlatformsFor(["imessage", "telegram"])).toEqual(["imessage"]);
+  test("passes provider keys through unchanged when they have no dashes", () => {
+    expect(cloudPlatformsFor(["slack", "telegram"])).toEqual([
+      "slack",
+      "telegram",
+    ]);
   });
 
   test("dedupes while preserving order", () => {
