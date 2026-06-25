@@ -189,9 +189,16 @@ describe("provisionSpectrumProject", () => {
 });
 
 describe("cloudPlatformsFor", () => {
+  test("always includes imessage — it's mandatory for any cloud project", () => {
+    // No selection still provisions iMessage.
+    expect(cloudPlatformsFor([])).toEqual(["imessage"]);
+    // A non-iMessage selection gets iMessage prepended.
+    expect(cloudPlatformsFor(["telegram"])).toEqual(["imessage", "telegram"]);
+  });
+
   test("normalizes dashes to underscores", () => {
-    expect(cloudPlatformsFor(["imessage"])).toEqual(["imessage"]);
     expect(cloudPlatformsFor(["whatsapp-business"])).toEqual([
+      "imessage",
       "whatsapp_business",
     ]);
     expect(cloudPlatformsFor(["imessage", "whatsapp-business"])).toEqual([
@@ -202,12 +209,14 @@ describe("cloudPlatformsFor", () => {
 
   test("passes provider keys through unchanged when they have no dashes", () => {
     expect(cloudPlatformsFor(["slack", "telegram"])).toEqual([
+      "imessage",
       "slack",
       "telegram",
     ]);
   });
 
-  test("dedupes while preserving order", () => {
+  test("dedupes the mandatory imessage when the user also selected it", () => {
+    expect(cloudPlatformsFor(["imessage"])).toEqual(["imessage"]);
     expect(cloudPlatformsFor(["imessage", "imessage"])).toEqual(["imessage"]);
   });
 });

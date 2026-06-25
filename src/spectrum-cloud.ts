@@ -31,9 +31,13 @@ const NOOP_LOGGER: CloudLogger = {
 /**
  * Resolve selected provider keys to the deduped, order-preserving list of
  * Spectrum Cloud platform names accepted by `projects create --platforms`.
+ *
+ * iMessage is always included: it's mandatory for any Spectrum Cloud project,
+ * so every cloud provision enables it regardless of which platforms the user
+ * scaffolded locally.
  */
 export function cloudPlatformsFor(providers: readonly string[]): string[] {
-  const platforms: string[] = [];
+  const platforms: string[] = ["imessage"];
   for (const provider of providers) {
     const platformNormalized = provider.replace(/-/g, "_");
     if (!platforms.includes(platformNormalized)) {
