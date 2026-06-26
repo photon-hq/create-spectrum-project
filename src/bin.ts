@@ -4,7 +4,10 @@ import { basename, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import pc from "picocolors";
-import { provisionSpectrumProject } from "./spectrum-cloud.ts";
+import {
+  cloudPlatformsFor,
+  provisionSpectrumProject,
+} from "./spectrum-cloud.ts";
 import { isPm, type PackageManager } from "./pm.ts";
 import { type PartialOptions, promptForOptions } from "./prompts.ts";
 import {
@@ -40,26 +43,38 @@ function visibleManifest(manifest: Manifest): Manifest {
   return manifest.filter((m) => !HIDDEN_PROVIDERS.has(m.key));
 }
 
-async function main(): Promise<number> {
-  const { values, positionals } = parseArgs({
-    args: process.argv.slice(2),
-    options: {
-      providers: { type: "string" },
-      pm: { type: "string" },
-      install: { type: "boolean", default: true },
-      "no-install": { type: "boolean" },
-      git: { type: "boolean", default: true },
-      "no-git": { type: "boolean" },
-      "no-skills": { type: "boolean" },
-      "no-cloud": { type: "boolean" },
-      yes: { type: "boolean", short: "y" },
-      verbose: { type: "boolean" },
-      help: { type: "boolean", short: "h" },
-      version: { type: "boolean" },
-    },
+// Parsed argv shape, shared by `main()` and `parseCliArgs` (exported for tests).
+// `platforms` is an alias for `providers`: the interactive prompts and Spectrum
+// Cloud both speak in "platforms", so that's the word users reach for on the
+// command line. Accepting only `--providers` made `--platforms imessage` fail
+// with "Unknown option", which read as "-y is broken when other flags are set".
+const CLI_OPTIONS = {
+  providers: { type: "string" },
+  platforms: { type: "string" },
+  pm: { type: "string" },
+  install: { type: "boolean", default: true },
+  "no-install": { type: "boolean" },
+  git: { type: "boolean", default: true },
+  "no-git": { type: "boolean" },
+  "no-skills": { type: "boolean" },
+  "no-cloud": { type: "boolean" },
+  yes: { type: "boolean", short: "y" },
+  verbose: { type: "boolean" },
+  help: { type: "boolean", short: "h" },
+  version: { type: "boolean" },
+} as const;
+
+export function parseCliArgs(args: string[]) {
+  return parseArgs({
+    args,
+    options: CLI_OPTIONS,
     allowPositionals: true,
     strict: true,
   });
+}
+
+async function main(): Promise<number> {
+  const { values, positionals } = parseCliArgs(process.argv.slice(2));
 
   const version = await readOwnVersion();
 
@@ -107,7 +122,10 @@ async function main(): Promise<number> {
   // Set up Spectrum Cloud before the spinner starts
   const credentials = opts.provisionCloud
     ? ((await provisionSpectrumProject(
-        { name: basename(resolve(opts.targetDir)) },
+        {
+          name: basename(resolve(opts.targetDir)),
+          platforms: cloudPlatformsFor(opts.providers),
+        },
         {
           logger: {
             step: (msg) => process.stdout.write(`${SYM.arrow} ${msg}\n`),
@@ -157,7 +175,7 @@ async function main(): Promise<number> {
   return 0;
 }
 
-function collectFlagOptions(
+export function collectFlagOptions(
   values: Record<string, unknown>,
   positionals: string[],
   manifest: Manifest,
@@ -166,8 +184,18 @@ function collectFlagOptions(
   if (positionals[0]) {
     partial.targetDir = positionals[0];
   }
-  if (typeof values.providers === "string") {
-    partial.providers = parseProviders(values.providers, manifest);
+  // `--platforms` is an alias for `--providers`; reject passing both so an
+  // ambiguous `--providers a --platforms b` doesn't silently pick one.
+  if (
+    typeof values.providers === "string" &&
+    typeof values.platforms === "string"
+  ) {
+    fail("Use either --platforms or --providers, not both.");
+  }
+  const platformsRaw =
+    typeof values.platforms === "string" ? values.platforms : values.providers;
+  if (typeof platformsRaw === "string") {
+    partial.providers = parseProviders(platformsRaw, manifest);
   }
   if (typeof values.pm === "string") {
     if (!isPm(values.pm)) {
@@ -202,7 +230,7 @@ function parseProviders(raw: string, manifest: Manifest): Provider[] {
     }
   }
   if (parts.length === 0) {
-    fail("--providers must list at least one provider");
+    fail("--platforms/--providers must list at least one provider");
   }
   if (parts.includes(TERMINAL_KEY) && parts.length > 1) {
     fail(
@@ -361,8 +389,8 @@ function printHelp(): void {
   const pad = (s: string) => s.padEnd(24, " ");
   const rows: [string, string][] = [
     [
-      pad(`${flag("--providers")} <list>`),
-      "Comma-separated provider keys (see Spectrum docs)",
+      pad(`${flag("--platforms")} <list>`),
+      "Comma-separated platform keys (alias: --providers)",
     ],
     [
       pad(`${flag("--pm")} <m>`),
@@ -410,9 +438,7 @@ function fail(message: string): never {
   process.exit(2);
 }
 
-try {
-  process.exitCode = await main();
-} catch (err) {
+function reportError(err: unknown): void {
   if (err instanceof TargetExistsError) {
     process.stderr.write(`\n${SYM.err} ${err.message}\n`);
     process.exitCode = 1;
@@ -433,5 +459,15 @@ try {
   } else {
     process.stderr.write(`\n${SYM.err} ${String(err)}\n`);
     process.exitCode = 1;
+  }
+}
+
+// Only drive the CLI when invoked directly. Importing this module (e.g. from
+// tests) must not kick off a scaffold or touch process.exitCode.
+if (import.meta.main) {
+  try {
+    process.exitCode = await main();
+  } catch (err) {
+    reportError(err);
   }
 }

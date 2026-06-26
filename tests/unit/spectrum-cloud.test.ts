@@ -1,5 +1,9 @@
 import { describe, expect, test } from "bun:test";
-import { type CliRunner, provisionSpectrumProject } from "~/spectrum-cloud.ts";
+import {
+  type CliRunner,
+  cloudPlatformsFor,
+  provisionSpectrumProject,
+} from "~/spectrum-cloud.ts";
 import { silentLogger } from "../helpers/logger.ts";
 
 /** Records every invocation and replies from a per-subcommand script. */
@@ -33,7 +37,7 @@ describe("provisionSpectrumProject", () => {
     });
 
     const creds = await provisionSpectrumProject(
-      { name: "my-app" },
+      { name: "my-app", platforms: ["imessage"] },
       { runner, logger: silent }
     );
 
@@ -43,7 +47,7 @@ describe("provisionSpectrumProject", () => {
     });
     // No login when already authed.
     expect(calls.some((c) => c[0] === "login")).toBe(false);
-    // Project created with the iMessage platform and the given name.
+    // Project created with the given platform and name.
     expect(calls).toContainEqual([
       "projects",
       "create",
@@ -53,6 +57,57 @@ describe("provisionSpectrumProject", () => {
       "imessage",
       "--json",
     ]);
+  });
+
+  test("multiple platforms → comma-joined --platforms", async () => {
+    const { runner, calls } = fakeRunner({
+      whoami: [{ code: 0, stdout: "{}" }],
+      projects: [
+        { code: 0, stdout: '{"id":"proj_m"}' },
+        { code: 0, stdout: '{"projectSecret":"spk_live_m"}' },
+      ],
+    });
+
+    await provisionSpectrumProject(
+      { name: "app", platforms: ["imessage", "whatsapp_business"] },
+      { runner, logger: silent }
+    );
+
+    expect(calls).toContainEqual([
+      "projects",
+      "create",
+      "--name",
+      "app",
+      "--platforms",
+      "imessage,whatsapp_business",
+      "--json",
+    ]);
+  });
+
+  test("no platforms → omits --platforms, still provisions", async () => {
+    const { runner, calls } = fakeRunner({
+      whoami: [{ code: 0, stdout: "{}" }],
+      projects: [
+        { code: 0, stdout: '{"id":"proj_t"}' },
+        { code: 0, stdout: '{"projectSecret":"spk_live_t"}' },
+      ],
+    });
+
+    const creds = await provisionSpectrumProject(
+      { name: "app", platforms: [] },
+      { runner, logger: silent }
+    );
+
+    expect(creds).toEqual({ projectId: "proj_t", projectSecret: "spk_live_t" });
+    // create issued without a --platforms flag.
+    expect(calls).toContainEqual([
+      "projects",
+      "create",
+      "--name",
+      "app",
+      "--json",
+    ]);
+    expect(calls.some((c) => c.includes("--platforms"))).toBe(false);
   });
 
   test("not authed → logs in, then succeeds", async () => {
@@ -67,7 +122,7 @@ describe("provisionSpectrumProject", () => {
     });
 
     const creds = await provisionSpectrumProject(
-      { name: "app" },
+      { name: "app", platforms: ["imessage"] },
       { runner, logger: silent }
     );
 
@@ -81,7 +136,10 @@ describe("provisionSpectrumProject", () => {
       login: [{ code: 0 }],
     });
     expect(
-      await provisionSpectrumProject({ name: "app" }, { runner, logger: silent })
+      await provisionSpectrumProject(
+        { name: "app", platforms: ["imessage"] },
+        { runner, logger: silent }
+      )
     ).toBeNull();
   });
 
@@ -91,7 +149,10 @@ describe("provisionSpectrumProject", () => {
       projects: [{ code: 1, stdout: "" }],
     });
     expect(
-      await provisionSpectrumProject({ name: "app" }, { runner, logger: silent })
+      await provisionSpectrumProject(
+        { name: "app", platforms: ["imessage"] },
+        { runner, logger: silent }
+      )
     ).toBeNull();
     // create attempted once; regenerate-secret never reached.
     expect(calls.filter((c) => c[0] === "projects")).toHaveLength(1);
@@ -103,7 +164,10 @@ describe("provisionSpectrumProject", () => {
       projects: [{ code: 0, stdout: "not json" }],
     });
     expect(
-      await provisionSpectrumProject({ name: "app" }, { runner, logger: silent })
+      await provisionSpectrumProject(
+        { name: "app", platforms: ["imessage"] },
+        { runner, logger: silent }
+      )
     ).toBeNull();
   });
 
@@ -116,7 +180,43 @@ describe("provisionSpectrumProject", () => {
       ],
     });
     expect(
-      await provisionSpectrumProject({ name: "app" }, { runner, logger: silent })
+      await provisionSpectrumProject(
+        { name: "app", platforms: ["imessage"] },
+        { runner, logger: silent }
+      )
     ).toBeNull();
+  });
+});
+
+describe("cloudPlatformsFor", () => {
+  test("always includes imessage — it's mandatory for any cloud project", () => {
+    // No selection still provisions iMessage.
+    expect(cloudPlatformsFor([])).toEqual(["imessage"]);
+    // A non-iMessage selection gets iMessage prepended.
+    expect(cloudPlatformsFor(["telegram"])).toEqual(["imessage", "telegram"]);
+  });
+
+  test("normalizes dashes to underscores", () => {
+    expect(cloudPlatformsFor(["whatsapp-business"])).toEqual([
+      "imessage",
+      "whatsapp_business",
+    ]);
+    expect(cloudPlatformsFor(["imessage", "whatsapp-business"])).toEqual([
+      "imessage",
+      "whatsapp_business",
+    ]);
+  });
+
+  test("passes provider keys through unchanged when they have no dashes", () => {
+    expect(cloudPlatformsFor(["slack", "telegram"])).toEqual([
+      "imessage",
+      "slack",
+      "telegram",
+    ]);
+  });
+
+  test("dedupes the mandatory imessage when the user also selected it", () => {
+    expect(cloudPlatformsFor(["imessage"])).toEqual(["imessage"]);
+    expect(cloudPlatformsFor(["imessage", "imessage"])).toEqual(["imessage"]);
   });
 });

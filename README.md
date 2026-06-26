@@ -31,7 +31,8 @@ Pass flags to skip prompts. Run `bun create spectrum-project@latest --help` for 
 Usage: create-spectrum-project [directory] [options]
 
 Options:
-  --providers <list>   Comma-separated keys: terminal, imessage, telegram, whatsapp-business
+  --platforms <list>   Comma-separated keys: terminal, imessage, telegram, whatsapp-business
+                       (alias: --providers)
   --pm <m>             bun | npm | pnpm | yarn (default: detected)
   --no-install         Skip dependency install
   --no-git             Skip git init
@@ -58,10 +59,10 @@ Examples:
 bun create spectrum-project@latest -y
 
 # Terminal sandbox (dev TUI, no credentials)
-bun create spectrum-project@latest my-app --providers terminal
+bun create spectrum-project@latest my-app --platforms terminal
 
 # iMessage + WhatsApp on pnpm, skip git
-bun create spectrum-project@latest my-app --providers imessage,whatsapp-business --pm pnpm --no-git
+bun create spectrum-project@latest my-app --platforms imessage,whatsapp-business --pm pnpm --no-git
 ```
 
 ## Requirements

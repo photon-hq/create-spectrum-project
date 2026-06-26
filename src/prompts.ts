@@ -117,20 +117,19 @@ export async function promptForOptions(
   };
 }
 
-/** Provider whose only credentials are the top-level Spectrum Cloud project
- * secret, so the whole project can be provisioned online and written to .env. */
-const IMESSAGE_KEY = "imessage";
-
 /**
  * Offer to set up Spectrum Cloud — create the project online and fill in .env.
- * Only offered when iMessage is selected (its credentials are just the project
- * secret); `--no-cloud` opts out. Returns false (no offer) otherwise.
+ * Offered for any platform project (anything but the dev-only terminal): every
+ * platform provider authenticates with the top-level Spectrum Cloud project
+ * secret, which provisioning creates and writes into .env. `--no-cloud` opts
+ * out. Returns false (no offer) for terminal-only projects.
  */
 async function askSetUpCloud(
   providers: Provider[],
   partial: PartialOptions,
 ): Promise<boolean> {
-  if (!providers.includes(IMESSAGE_KEY) || partial.cloud === false) {
+  const hasPlatform = providers.some((p) => p !== TERMINAL_KEY);
+  if (!hasPlatform || partial.cloud === false) {
     return false;
   }
   const { value } = await prompts(
