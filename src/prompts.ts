@@ -32,7 +32,7 @@ const onCancel = () => {
 
 export async function promptForOptions(
   partial: PartialOptions,
-  manifest: Manifest,
+  manifest: Manifest
 ): Promise<PromptResult> {
   const targetDir =
     partial.targetDir ??
@@ -44,7 +44,7 @@ export async function promptForOptions(
           message: "Project directory",
           initial: "my-spectrum-app",
         },
-        { onCancel },
+        { onCancel }
       )
     ).value;
 
@@ -69,7 +69,7 @@ export async function promptForOptions(
           choices: pmChoices.map((p) => ({ title: p, value: p })),
           initial: pmChoices.indexOf(detected),
         },
-        { onCancel },
+        { onCancel }
       )
     ).value;
 
@@ -86,7 +86,7 @@ export async function promptForOptions(
           message: "Install dependencies?",
           initial: true,
         },
-        { onCancel },
+        { onCancel }
       )
     ).value;
 
@@ -100,7 +100,7 @@ export async function promptForOptions(
           message: "Install Spectrum skill for AI agents?",
           initial: true,
         },
-        { onCancel },
+        { onCancel }
       )
     ).value;
 
@@ -114,7 +114,7 @@ export async function promptForOptions(
           message: "Initialize git?",
           initial: true,
         },
-        { onCancel },
+        { onCancel }
       )
     ).value;
 
@@ -146,7 +146,7 @@ async function askRotateSecret(): Promise<boolean> {
         ".env. Say No to keep your current secret and fill it in yourself.",
       initial: true,
     },
-    { onCancel },
+    { onCancel }
   );
   return value;
 }
@@ -160,7 +160,7 @@ async function askRotateSecret(): Promise<boolean> {
  */
 async function askSetUpCloud(
   providers: Provider[],
-  partial: PartialOptions,
+  partial: PartialOptions
 ): Promise<boolean> {
   // An explicit --projectId is an unambiguous "yes, set up cloud with this
   // project"
@@ -179,7 +179,7 @@ async function askSetUpCloud(
         "Set up Spectrum Cloud now? (creates your project and fills in .env)",
       initial: true,
     },
-    { onCancel },
+    { onCancel }
   );
   return value;
 }
@@ -219,7 +219,7 @@ async function askProviders(manifest: Manifest): Promise<Provider[]> {
       ],
       initial: 0,
     },
-    { onCancel },
+    { onCancel }
   );
 
   if (kind === "terminal") {
@@ -229,7 +229,7 @@ async function askProviders(manifest: Manifest): Promise<Provider[]> {
 }
 
 async function askPlatformProviders(
-  platformProviders: Manifest,
+  platformProviders: Manifest
 ): Promise<Provider[]> {
   const { values } = await prompts(
     {
@@ -244,7 +244,7 @@ async function askPlatformProviders(
       })),
       min: 1,
     },
-    { onCancel },
+    { onCancel }
   );
   return values as Provider[];
 }
