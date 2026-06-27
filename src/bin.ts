@@ -4,10 +4,6 @@ import { basename, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import pc from "picocolors";
-import {
-  cloudPlatformsFor,
-  provisionSpectrumProject,
-} from "./spectrum-cloud.ts";
 import { isPm, type PackageManager } from "./pm.ts";
 import { type PartialOptions, promptForOptions } from "./prompts.ts";
 import {
@@ -20,6 +16,10 @@ import {
   TERMINAL_KEY,
   VersionResolutionError,
 } from "./scaffold.ts";
+import {
+  cloudPlatformsFor,
+  provisionSpectrumProject,
+} from "./spectrum-cloud.ts";
 
 const SYM = {
   ok: pc.green("✓"),
@@ -51,6 +51,7 @@ function visibleManifest(manifest: Manifest): Manifest {
 const CLI_OPTIONS = {
   providers: { type: "string" },
   platforms: { type: "string" },
+  projectId: { type: "string" },
   pm: { type: "string" },
   install: { type: "boolean", default: true },
   "no-install": { type: "boolean" },
@@ -88,7 +89,7 @@ async function main(): Promise<number> {
   }
 
   process.stdout.write(
-    `\n${pc.bold("create-spectrum-project")} ${pc.dim(`v${version}`)}\n\n`,
+    `\n${pc.bold("create-spectrum-project")} ${pc.dim(`v${version}`)}\n\n`
   );
 
   // Fetch the live provider list before prompts or flag validation can run,
@@ -125,13 +126,15 @@ async function main(): Promise<number> {
         {
           name: basename(resolve(opts.targetDir)),
           platforms: cloudPlatformsFor(opts.providers),
+          projectId: opts.projectId,
+          rotateSecret: opts.rotateSecret,
         },
         {
           logger: {
             step: (msg) => process.stdout.write(`${SYM.arrow} ${msg}\n`),
             warn: (msg) => process.stderr.write(`${pc.yellow("!")} ${msg}\n`),
           },
-        },
+        }
       )) ?? undefined)
     : undefined;
 
@@ -165,12 +168,16 @@ async function main(): Promise<number> {
   }
   const seconds = ((Date.now() - start) / 1000).toFixed(1);
   spin.stop(
-    `${SYM.ok} Created ${pc.cyan(basename(result.targetDir))} ${SYM.dot} ${pc.bold(`spectrum-ts ${result.spectrumTsVersion}`)} ${pc.dim(`(${seconds}s)`)}`,
+    `${SYM.ok} Created ${pc.cyan(basename(result.targetDir))} ${SYM.dot} ${pc.bold(`spectrum-ts ${result.spectrumTsVersion}`)} ${pc.dim(`(${seconds}s)`)}`
   );
 
-  printNextSteps(result, opts, credentials !== undefined);
+  // A blank secret (user declined rotation) still needs filling in, so treat
+  // credentials as "written" only when the secret is actually present.
+  const secretWritten =
+    credentials !== undefined && credentials.projectSecret.length > 0;
+  printNextSteps(result, opts, secretWritten);
   process.stdout.write(
-    `\n${SYM.arrow} ${pc.dim("Docs:")} ${pc.cyan("https://photon.codes/docs/spectrum-ts")}\n\n`,
+    `\n${SYM.arrow} ${pc.dim("Docs:")} ${pc.cyan("https://photon.codes/docs/spectrum-ts")}\n\n`
   );
   return 0;
 }
@@ -178,7 +185,7 @@ async function main(): Promise<number> {
 export function collectFlagOptions(
   values: Record<string, unknown>,
   positionals: string[],
-  manifest: Manifest,
+  manifest: Manifest
 ): PartialOptions {
   const partial: PartialOptions = {};
   if (positionals[0]) {
@@ -196,6 +203,18 @@ export function collectFlagOptions(
     typeof values.platforms === "string" ? values.platforms : values.providers;
   if (typeof platformsRaw === "string") {
     partial.providers = parseProviders(platformsRaw, manifest);
+  }
+  if (typeof values.projectId === "string") {
+    const id = values.projectId.trim();
+    if (!id) {
+      fail("--projectId must not be empty.");
+    }
+    if (values["no-cloud"]) {
+      fail(
+        "--projectId can't be combined with --no-cloud — the project id is what sets up Spectrum Cloud."
+      );
+    }
+    partial.projectId = id;
   }
   if (typeof values.pm === "string") {
     if (!isPm(values.pm)) {
@@ -234,7 +253,7 @@ function parseProviders(raw: string, manifest: Manifest): Provider[] {
   }
   if (parts.includes(TERMINAL_KEY) && parts.length > 1) {
     fail(
-      `${TERMINAL_KEY} is a dev-only TUI and can't be mixed with platform providers. Pick ${TERMINAL_KEY} on its own, or pick one or more of: ${validKeys.filter((k) => k !== TERMINAL_KEY).join(", ")}.`,
+      `${TERMINAL_KEY} is a dev-only TUI and can't be mixed with platform providers. Pick ${TERMINAL_KEY} on its own, or pick one or more of: ${validKeys.filter((k) => k !== TERMINAL_KEY).join(", ")}.`
     );
   }
   return parts;
@@ -256,12 +275,20 @@ function fillDefaults(partial: PartialOptions, manifest: Manifest) {
     install: partial.install ?? true,
     git: partial.git ?? true,
     skills: partial.skills ?? true,
-    // Cloud setup needs an interactive login; the -y path is unattended.
-    provisionCloud: false,
+    projectId: partial.projectId,
+    // Cloud setup normally needs an interactive login, so the unattended -y
+    // path opts out — unless the user pinned a project with --projectId, in
+    // which case provisioning (mint secret → .env) is exactly what they asked
+    // for. It still fails soft to a manual .env if auth can't complete.
+    provisionCloud: partial.projectId !== undefined,
+    // -y is "do the whole thing unattended": when a project is pinned, that
+    // includes rotating its secret (the interactive caution prompt is skipped).
+    rotateSecret: partial.projectId === undefined ? undefined : true,
   } satisfies PartialOptions & {
     targetDir: string;
     providers: Provider[];
     provisionCloud: boolean;
+    rotateSecret: boolean | undefined;
   };
 }
 
@@ -277,7 +304,7 @@ function printNextSteps(
     targetDir: string;
   },
   opts: { packageManager?: PackageManager; skills?: boolean },
-  credentialsWritten: boolean,
+  credentialsWritten: boolean
 ): void {
   const pm = opts.packageManager ?? "bun";
   const cwd = basename(result.targetDir);
@@ -355,7 +382,7 @@ function startSpinner(): Spinner {
       return;
     }
     process.stderr.write(
-      `\r\x1b[K${pc.dim(frames[i++ % frames.length])} ${msg}`,
+      `\r\x1b[K${pc.dim(frames[i++ % frames.length])} ${msg}`
     );
   };
   const interval = setInterval(render, 80);
@@ -393,6 +420,10 @@ function printHelp(): void {
       "Comma-separated platform keys (alias: --providers)",
     ],
     [
+      pad(`${flag("--projectId")} <id>`),
+      "Use an existing Spectrum Cloud project.",
+    ],
+    [
       pad(`${flag("--pm")} <m>`),
       `bun | npm | pnpm | yarn ${dim("(default: detected)")}`,
     ],
@@ -417,7 +448,7 @@ function printHelp(): void {
       `  ${pc.bold("Options")}`,
       ...rows.map(([k, v]) => `    ${k}${dim(v)}`),
       "",
-    ].join("\n"),
+    ].join("\n")
   );
 }
 
@@ -444,7 +475,7 @@ function reportError(err: unknown): void {
     process.exitCode = 1;
   } else if (err instanceof InstallError) {
     process.stderr.write(
-      `\n${SYM.err} Install failed (exit ${err.exitCode}). cd into the project and run install manually to retry.\n`,
+      `\n${SYM.err} Install failed (exit ${err.exitCode}). cd into the project and run install manually to retry.\n`
     );
     process.exitCode = 1;
   } else if (err instanceof VersionResolutionError) {

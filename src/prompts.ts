@@ -9,12 +9,21 @@ export interface PartialOptions {
   git?: boolean;
   install?: boolean;
   packageManager?: PackageManager;
+  projectId?: string;
   providers?: Provider[];
   skills?: boolean;
   targetDir?: string;
 }
 
-export type PromptResult = ScaffoldOptions & { provisionCloud: boolean };
+export type PromptResult = ScaffoldOptions & {
+  projectId?: string;
+  provisionCloud: boolean;
+  /**
+   * For an existing `projectId`: whether to rotate (regenerate) its secret.
+   * `undefined` when no project was pinned (a fresh project always mints).
+   */
+  rotateSecret?: boolean;
+};
 
 const onCancel = () => {
   process.stderr.write(`\n${pc.dim("Cancelled.")}\n`);
@@ -23,7 +32,7 @@ const onCancel = () => {
 
 export async function promptForOptions(
   partial: PartialOptions,
-  manifest: Manifest,
+  manifest: Manifest
 ): Promise<PromptResult> {
   const targetDir =
     partial.targetDir ??
@@ -35,13 +44,17 @@ export async function promptForOptions(
           message: "Project directory",
           initial: "my-spectrum-app",
         },
-        { onCancel },
+        { onCancel }
       )
     ).value;
 
   const providers = partial.providers ?? (await askProviders(manifest));
 
   const provisionCloud = await askSetUpCloud(providers, partial);
+
+  // Pinning an existing project mints a fresh secret by rotating it, which
+  // invalidates the old one. Check before doing something destructive.
+  const rotateSecret = partial.projectId ? await askRotateSecret() : undefined;
 
   const detected = detectPm() ?? "bun";
   const pmChoices: PackageManager[] = ["bun", "npm", "pnpm", "yarn"];
@@ -56,7 +69,7 @@ export async function promptForOptions(
           choices: pmChoices.map((p) => ({ title: p, value: p })),
           initial: pmChoices.indexOf(detected),
         },
-        { onCancel },
+        { onCancel }
       )
     ).value;
 
@@ -73,7 +86,7 @@ export async function promptForOptions(
           message: "Install dependencies?",
           initial: true,
         },
-        { onCancel },
+        { onCancel }
       )
     ).value;
 
@@ -87,7 +100,7 @@ export async function promptForOptions(
           message: "Install Spectrum skill for AI agents?",
           initial: true,
         },
-        { onCancel },
+        { onCancel }
       )
     ).value;
 
@@ -101,7 +114,7 @@ export async function promptForOptions(
           message: "Initialize git?",
           initial: true,
         },
-        { onCancel },
+        { onCancel }
       )
     ).value;
 
@@ -113,8 +126,29 @@ export async function promptForOptions(
     install,
     git,
     skills,
+    projectId: partial.projectId,
     provisionCloud,
+    rotateSecret,
   };
+}
+
+/**
+ * Caution gate for `--projectId`: provisioning rotates (regenerates) the
+ * project's API secret so it can write a working one into `.env`.
+ */
+async function askRotateSecret(): Promise<boolean> {
+  const { value } = await prompts(
+    {
+      type: "confirm",
+      name: "value",
+      message:
+        "Heads up: this will rotate your project's secret and write it into " +
+        ".env. Say No to keep your current secret and fill it in yourself.",
+      initial: true,
+    },
+    { onCancel }
+  );
+  return value;
 }
 
 /**
@@ -126,8 +160,13 @@ export async function promptForOptions(
  */
 async function askSetUpCloud(
   providers: Provider[],
-  partial: PartialOptions,
+  partial: PartialOptions
 ): Promise<boolean> {
+  // An explicit --projectId is an unambiguous "yes, set up cloud with this
+  // project"
+  if (partial.projectId) {
+    return true;
+  }
   const hasPlatform = providers.some((p) => p !== TERMINAL_KEY);
   if (!hasPlatform || partial.cloud === false) {
     return false;
@@ -140,7 +179,7 @@ async function askSetUpCloud(
         "Set up Spectrum Cloud now? (creates your project and fills in .env)",
       initial: true,
     },
-    { onCancel },
+    { onCancel }
   );
   return value;
 }
@@ -180,7 +219,7 @@ async function askProviders(manifest: Manifest): Promise<Provider[]> {
       ],
       initial: 0,
     },
-    { onCancel },
+    { onCancel }
   );
 
   if (kind === "terminal") {
@@ -190,7 +229,7 @@ async function askProviders(manifest: Manifest): Promise<Provider[]> {
 }
 
 async function askPlatformProviders(
-  platformProviders: Manifest,
+  platformProviders: Manifest
 ): Promise<Provider[]> {
   const { values } = await prompts(
     {
@@ -205,7 +244,7 @@ async function askPlatformProviders(
       })),
       min: 1,
     },
-    { onCancel },
+    { onCancel }
   );
   return values as Provider[];
 }

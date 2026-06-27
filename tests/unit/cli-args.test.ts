@@ -39,3 +39,33 @@ describe("cli args — platform selection flag", () => {
     expect(optionsFor(["my-app"]).providers).toBeUndefined();
   });
 });
+
+describe("cli args — --projectId", () => {
+  test("captures the supplied project id", () => {
+    expect(optionsFor(["my-app", "--projectId", "proj_abc"]).projectId).toBe(
+      "proj_abc"
+    );
+  });
+
+  test("trims surrounding whitespace", () => {
+    expect(optionsFor(["--projectId", "  proj_abc  "]).projectId).toBe(
+      "proj_abc"
+    );
+  });
+
+  test("is independent of provider selection", () => {
+    const opts = optionsFor([
+      "my-app",
+      "--platforms",
+      "telegram",
+      "--projectId",
+      "proj_abc",
+    ]);
+    expect(opts.projectId).toBe("proj_abc");
+    expect(opts.providers).toEqual(["telegram"]);
+  });
+
+  test("left unset when the flag is absent", () => {
+    expect(optionsFor(["my-app"]).projectId).toBeUndefined();
+  });
+});
