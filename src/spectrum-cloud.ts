@@ -155,6 +155,16 @@ export async function provisionSpectrumProject(
     return null;
   };
 
+  // Existing project + the user declined rotation: keep their secret valid
+  // and hand back a blank one to fill in manually. This path needs no cloud
+  // access, so resolve it before any auth/login work.
+  if (opts.projectId && opts.rotateSecret === false) {
+    logger.step(
+      "Keeping the existing secret — fill PROJECT_SECRET into .env yourself."
+    );
+    return { projectId: opts.projectId, projectSecret: "" };
+  }
+
   try {
     if (!(await isAuthed(run))) {
       logger.step("Logging in to Spectrum Cloud…");
@@ -183,15 +193,6 @@ export async function provisionSpectrumProject(
         );
       }
       projectId = createdId;
-    }
-
-    // Existing project + the user declined rotation: keep their secret valid
-    // and hand back a blank one to fill in manually.
-    if (opts.projectId && opts.rotateSecret === false) {
-      logger.step(
-        "Keeping the existing secret — fill PROJECT_SECRET into .env yourself."
-      );
-      return { projectId, projectSecret: "" };
     }
 
     logger.step("Generating project secret…");
