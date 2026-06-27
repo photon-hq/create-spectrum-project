@@ -171,6 +171,133 @@ describe("provisionSpectrumProject", () => {
     ).toBeNull();
   });
 
+  test("existing projectId → skips create, mints secret for that id", async () => {
+    const { runner, calls } = fakeRunner({
+      whoami: [{ code: 0, stdout: "{}" }],
+      // Only the regenerate-secret call lands on `projects` now — no create.
+      projects: [{ code: 0, stdout: '{"projectSecret":"spk_live_existing"}' }],
+    });
+
+    const creds = await provisionSpectrumProject(
+      { name: "app", platforms: ["imessage"], projectId: "proj_existing" },
+      { runner, logger: silent }
+    );
+
+    expect(creds).toEqual({
+      projectId: "proj_existing",
+      projectSecret: "spk_live_existing",
+    });
+    // Never created a project — the supplied id is used as-is.
+    expect(calls.some((c) => c[0] === "projects" && c[1] === "create")).toBe(
+      false
+    );
+    // regenerate-secret targeted the supplied id.
+    expect(calls).toContainEqual([
+      "projects",
+      "regenerate-secret",
+      "-y",
+      "--project",
+      "proj_existing",
+      "--json",
+    ]);
+  });
+
+  test("existing projectId but secret mint fails → null, no create", async () => {
+    const { runner, calls } = fakeRunner({
+      whoami: [{ code: 0, stdout: "{}" }],
+      projects: [{ code: 1, stdout: "" }],
+    });
+
+    expect(
+      await provisionSpectrumProject(
+        { name: "app", platforms: ["imessage"], projectId: "proj_bad" },
+        { runner, logger: silent }
+      )
+    ).toBeNull();
+    expect(calls.some((c) => c[0] === "projects" && c[1] === "create")).toBe(
+      false
+    );
+  });
+
+  test("existing projectId, rotateSecret false → pins id, leaves secret blank", async () => {
+    const { runner, calls } = fakeRunner({
+      whoami: [{ code: 0, stdout: "{}" }],
+    });
+
+    const creds = await provisionSpectrumProject(
+      {
+        name: "app",
+        platforms: ["imessage"],
+        projectId: "proj_keep",
+        rotateSecret: false,
+      },
+      { runner, logger: silent }
+    );
+
+    // Project id is pinned for .env; secret left blank for the user to fill.
+    expect(creds).toEqual({ projectId: "proj_keep", projectSecret: "" });
+    // The existing secret stays valid — no regenerate-secret (or any
+    // `projects`) call is issued.
+    expect(calls.some((c) => c[0] === "projects")).toBe(false);
+  });
+
+  test("existing projectId, rotateSecret true → rotates the secret", async () => {
+    const { runner, calls } = fakeRunner({
+      whoami: [{ code: 0, stdout: "{}" }],
+      projects: [{ code: 0, stdout: '{"projectSecret":"spk_live_rot"}' }],
+    });
+
+    const creds = await provisionSpectrumProject(
+      {
+        name: "app",
+        platforms: ["imessage"],
+        projectId: "proj_rot",
+        rotateSecret: true,
+      },
+      { runner, logger: silent }
+    );
+
+    expect(creds).toEqual({
+      projectId: "proj_rot",
+      projectSecret: "spk_live_rot",
+    });
+    expect(calls).toContainEqual([
+      "projects",
+      "regenerate-secret",
+      "-y",
+      "--project",
+      "proj_rot",
+      "--json",
+    ]);
+  });
+
+  test("new project ignores rotateSecret false — a fresh project must mint", async () => {
+    const { runner, calls } = fakeRunner({
+      whoami: [{ code: 0, stdout: "{}" }],
+      projects: [
+        { code: 0, stdout: '{"id":"proj_new"}' },
+        { code: 0, stdout: '{"projectSecret":"spk_live_new"}' },
+      ],
+    });
+
+    const creds = await provisionSpectrumProject(
+      { name: "app", platforms: ["imessage"], rotateSecret: false },
+      { runner, logger: silent }
+    );
+
+    expect(creds).toEqual({
+      projectId: "proj_new",
+      projectSecret: "spk_live_new",
+    });
+    // rotateSecret only governs existing projects; a created one still mints.
+    expect(calls.some((c) => c[0] === "projects" && c[1] === "create")).toBe(
+      true
+    );
+    expect(
+      calls.some((c) => c[0] === "projects" && c[1] === "regenerate-secret")
+    ).toBe(true);
+  });
+
   test("secret rotation returns no secret → null", async () => {
     const { runner } = fakeRunner({
       whoami: [{ code: 0, stdout: "{}" }],

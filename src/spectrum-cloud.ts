@@ -125,12 +125,27 @@ function parseField(
 /**
  * Set up a Spectrum Cloud project and return its credentials, ready to be
  * written into the scaffold's `.env`. Authenticates inline (running `photon
- * login` if needed), creates the project enabling `opts.platforms`, then mints
- * its secret. Pass an empty `platforms` to create a project with no managed
- * platform (e.g. a Slack/Telegram-only scaffold that just needs the secret).
+ * login` if needed), then mints the project secret.
+ *
+ * When `opts.projectId` is supplied, the create step is skipped entirely: the
+ * existing project is used as-is and `opts.platforms`/`opts.name` are ignored.
+ * Otherwise a fresh project is created enabling `opts.platforms` (pass an empty
+ * list for a project with no managed platform — e.g. a Slack/Telegram-only
+ * scaffold that just needs the secret).
+ *
+ * `opts.rotateSecret` only applies to an existing `opts.projectId`. When it's
+ * `false`, the secret is left untouched (rotating it would invalidate the one
+ * already in use): PROJECT_ID is still pinned and the returned `projectSecret`
+ * is empty so the user fills it in from the dashboard. A freshly created
+ * project always mints, regardless of this flag.
  */
 export async function provisionSpectrumProject(
-  opts: { name: string; platforms: readonly string[] },
+  opts: {
+    name: string;
+    platforms: readonly string[];
+    projectId?: string;
+    rotateSecret?: boolean;
+  },
   deps: ProvisionDeps = {},
 ): Promise<SpectrumCredentials | null> {
   const logger = deps.logger ?? NOOP_LOGGER;
@@ -149,18 +164,34 @@ export async function provisionSpectrumProject(
       }
     }
 
-    logger.step("Creating your Spectrum Cloud project…");
-    const createArgs = ["projects", "create", "--name", opts.name];
-    if (opts.platforms.length > 0) {
-      createArgs.push("--platforms", opts.platforms.join(","));
+    let projectId: string;
+    if (opts.projectId) {
+      logger.step("Using your existing Spectrum Cloud project…");
+      projectId = opts.projectId;
+    } else {
+      logger.step("Creating your Spectrum Cloud project…");
+      const createArgs = ["projects", "create", "--name", opts.name];
+      if (opts.platforms.length > 0) {
+        createArgs.push("--platforms", opts.platforms.join(","));
+      }
+      createArgs.push("--json");
+      const created = await run(createArgs, { capture: true });
+      const createdId = parseField(created, "id");
+      if (!createdId) {
+        return bail(
+          "Could not create the Spectrum Cloud project; skipping setup.",
+        );
+      }
+      projectId = createdId;
     }
-    createArgs.push("--json");
-    const created = await run(createArgs, { capture: true });
-    const projectId = parseField(created, "id");
-    if (!projectId) {
-      return bail(
-        "Could not create the Spectrum Cloud project; skipping setup.",
+
+    // Existing project + the user declined rotation: keep their secret valid
+    // and hand back a blank one to fill in manually.
+    if (opts.projectId && opts.rotateSecret === false) {
+      logger.step(
+        "Keeping the existing secret — fill PROJECT_SECRET into .env yourself.",
       );
+      return { projectId, projectSecret: "" };
     }
 
     logger.step("Generating project secret…");
@@ -170,7 +201,11 @@ export async function provisionSpectrumProject(
     );
     const projectSecret = parseField(rotated, "projectSecret");
     if (!projectSecret) {
-      return bail("Created the project but could not mint its secret;");
+      return bail(
+        opts.projectId
+          ? `Could not mint a secret for project ${projectId}; check the id and your access with \`photon whoami\`.`
+          : "Created the project but could not mint its secret;",
+      );
     }
 
     return { projectId, projectSecret };
