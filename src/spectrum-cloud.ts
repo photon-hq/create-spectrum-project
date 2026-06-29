@@ -112,20 +112,17 @@ function parseField(
 }
 
 /**
- * Obtain a project's API secret. By default this just reads the existing secret
- * (`projects secret`) so nothing in use gets invalidated. Only when `rotate` is
- * explicitly true does it mint a fresh one (`projects regenerate-secret`).
- * Returns null when the CLI surfaces no secret.
+ * Read a project's API secret (`projects secret`) so the one already in use
+ * stays valid. Returns null when the CLI surfaces no secret.
  */
-async function acquireProjectSecret(
+async function readProjectSecret(
   run: CliRunner,
-  projectId: string,
-  rotate: boolean
+  projectId: string
 ): Promise<string | null> {
-  const args = rotate
-    ? ["projects", "regenerate-secret", "-y", "--project", projectId, "--json"]
-    : ["projects", "secret", "--project", projectId, "--json"];
-  const result = await run(args, { capture: true });
+  const result = await run(
+    ["projects", "secret", "--project", projectId, "--json"],
+    { capture: true }
+  );
   return parseField(result, "projectSecret");
 }
 
@@ -140,18 +137,15 @@ async function acquireProjectSecret(
  * list for a project with no managed platform — e.g. a Slack/Telegram-only
  * scaffold that just needs the secret).
  *
- * The secret is always *read* (`projects secret`) so the one already in use
- * stays valid — `projects create` mints one server-side, and an existing
- * project already has its own. Rotation only happens when `opts.rotateSecret`
- * is explicitly `true` (a deliberate interactive opt-in); the unattended `-y`
- * path never rotates.
+ * The secret is always *read* (`projects secret`), never rotated, so any secret
+ * already in use stays valid — `projects create` mints one server-side, and an
+ * existing project already has its own.
  */
 export async function provisionSpectrumProject(
   opts: {
     name: string;
     platforms: readonly string[];
     projectId?: string;
-    rotateSecret?: boolean;
   },
   deps: ProvisionDeps = {}
 ): Promise<SpectrumCredentials | null> {
@@ -192,18 +186,12 @@ export async function provisionSpectrumProject(
       projectId = createdId;
     }
 
-    // Read the secret by default; only rotate when the user explicitly opted
-    // in. Reading keeps any secret already in use valid.
-    const rotate = opts.rotateSecret === true;
-    logger.step(
-      rotate ? "Rotating project secret…" : "Reading project secret…"
-    );
-    const projectSecret = await acquireProjectSecret(run, projectId, rotate);
+    logger.step("Reading project secret…");
+    const projectSecret = await readProjectSecret(run, projectId);
     if (!projectSecret) {
-      const verb = rotate ? "rotate" : "read";
       return bail(
         opts.projectId
-          ? `Could not ${verb} the secret for project ${projectId}; check the id and your access with \`photon whoami\`.`
+          ? `Could not read the secret for project ${projectId}; check the id and your access with \`photon whoami\`.`
           : "Created the project but could not read its secret;"
       );
     }

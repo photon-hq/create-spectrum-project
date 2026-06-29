@@ -18,12 +18,6 @@ export interface PartialOptions {
 export type PromptResult = ScaffoldOptions & {
   projectId?: string;
   provisionCloud: boolean;
-  /**
-   * For an existing `projectId`: whether to rotate (regenerate) its secret
-   * instead of just reading the current one. Defaults to reading; `undefined`
-   * when no project was pinned.
-   */
-  rotateSecret?: boolean;
 };
 
 const onCancel = () => {
@@ -52,10 +46,6 @@ export async function promptForOptions(
   const providers = partial.providers ?? (await askProviders(manifest));
 
   const provisionCloud = await askSetUpCloud(providers, partial);
-
-  // Pinning an existing project reads its current secret by default. Offer
-  // rotation as an explicit opt-in, since rotating invalidates the old secret.
-  const rotateSecret = partial.projectId ? await askRotateSecret() : undefined;
 
   const detected = detectPm() ?? "bun";
   const pmChoices: PackageManager[] = ["bun", "npm", "pnpm", "yarn"];
@@ -129,28 +119,7 @@ export async function promptForOptions(
     skills,
     projectId: partial.projectId,
     provisionCloud,
-    rotateSecret,
   };
-}
-
-/**
- * Opt-in gate for `--projectId`: by default the existing project's current
- * secret is read straight into `.env`. Saying Yes rotates (regenerates) it
- * instead, which invalidates the old secret.
- */
-async function askRotateSecret(): Promise<boolean> {
-  const { value } = await prompts(
-    {
-      type: "confirm",
-      name: "value",
-      message:
-        "Rotate your project's secret? This invalidates the current one. " +
-        "Say No to just pull your existing secret into .env.",
-      initial: false,
-    },
-    { onCancel }
-  );
-  return value;
 }
 
 /**

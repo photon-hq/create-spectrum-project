@@ -127,7 +127,6 @@ async function main(): Promise<number> {
           name: basename(resolve(opts.targetDir)),
           platforms: cloudPlatformsFor(opts.providers),
           projectId: opts.projectId,
-          rotateSecret: opts.rotateSecret,
         },
         {
           logger: {
@@ -171,8 +170,8 @@ async function main(): Promise<number> {
     `${SYM.ok} Created ${pc.cyan(basename(result.targetDir))} ${SYM.dot} ${pc.bold(`spectrum-ts ${result.spectrumTsVersion}`)} ${pc.dim(`(${seconds}s)`)}`
   );
 
-  // A blank secret (user declined rotation) still needs filling in, so treat
-  // credentials as "written" only when the secret is actually present.
+  // If provisioning soft-failed, the .env secret is blank and still needs
+  // filling in, so treat credentials as "written" only when it's present.
   const secretWritten =
     credentials !== undefined && credentials.projectSecret.length > 0;
   printNextSteps(result, opts, secretWritten);
@@ -281,14 +280,10 @@ function fillDefaults(partial: PartialOptions, manifest: Manifest) {
     // which case provisioning (read secret → .env) is exactly what they asked
     // for. It still fails soft to a manual .env if auth can't complete.
     provisionCloud: partial.projectId !== undefined,
-    // -y never rotates: an existing project's secret is read as-is so nothing
-    // already in use gets invalidated. Rotation is an explicit interactive opt-in.
-    rotateSecret: false,
   } satisfies PartialOptions & {
     targetDir: string;
     providers: Provider[];
     provisionCloud: boolean;
-    rotateSecret: boolean | undefined;
   };
 }
 
