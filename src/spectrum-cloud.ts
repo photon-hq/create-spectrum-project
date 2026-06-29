@@ -112,17 +112,17 @@ function parseField(
 }
 
 /**
- * Obtain a project's API secret. A freshly created project (`existing: false`)
- * already has a server-minted secret, so read it without rotating; an existing
- * project the user pinned is rotated with their consent. Returns null when the
- * CLI surfaces no secret.
+ * Obtain a project's API secret. By default this just reads the existing secret
+ * (`projects secret`) so nothing in use gets invalidated. Only when `rotate` is
+ * explicitly true does it mint a fresh one (`projects regenerate-secret`).
+ * Returns null when the CLI surfaces no secret.
  */
 async function acquireProjectSecret(
   run: CliRunner,
   projectId: string,
-  existing: boolean
+  rotate: boolean
 ): Promise<string | null> {
-  const args = existing
+  const args = rotate
     ? ["projects", "regenerate-secret", "-y", "--project", projectId, "--json"]
     : ["projects", "secret", "--project", projectId, "--json"];
   const result = await run(args, { capture: true });
@@ -140,13 +140,11 @@ async function acquireProjectSecret(
  * list for a project with no managed platform — e.g. a Slack/Telegram-only
  * scaffold that just needs the secret).
  *
- * `opts.rotateSecret` only applies to an existing `opts.projectId`. When it's
- * `false`, the secret is left untouched (rotating it would invalidate the one
- * already in use): PROJECT_ID is still pinned and the returned `projectSecret`
- * is empty so the user fills it in from the dashboard. When it's `true`, the
- * existing project's secret is rotated. A freshly created project just reads
- * its secret — `projects create` already mints one, so re-minting would
- * needlessly invalidate it before the scaffold ever used it.
+ * The secret is always *read* (`projects secret`) so the one already in use
+ * stays valid — `projects create` mints one server-side, and an existing
+ * project already has its own. Rotation only happens when `opts.rotateSecret`
+ * is explicitly `true` (a deliberate interactive opt-in); the unattended `-y`
+ * path never rotates.
  */
 export async function provisionSpectrumProject(
   opts: {
@@ -163,16 +161,6 @@ export async function provisionSpectrumProject(
     logger.warn(`${msg} Fill in .env manually.`);
     return null;
   };
-
-  // Existing project + the user declined rotation: keep their secret valid
-  // and hand back a blank one to fill in manually. This path needs no cloud
-  // access, so resolve it before any auth/login work.
-  if (opts.projectId && opts.rotateSecret === false) {
-    logger.step(
-      "Keeping the existing secret — fill PROJECT_SECRET into .env yourself."
-    );
-    return { projectId: opts.projectId, projectSecret: "" };
-  }
 
   try {
     if (!(await isAuthed(run))) {
@@ -204,18 +192,18 @@ export async function provisionSpectrumProject(
       projectId = createdId;
     }
 
-    // Existing project: rotate (the user consented — rotateSecret === false
-    // bailed above). Freshly created project: read its server-minted secret,
-    // since rotating would invalidate it before the scaffold ever wrote .env.
-    const existing = Boolean(opts.projectId);
+    // Read the secret by default; only rotate when the user explicitly opted
+    // in. Reading keeps any secret already in use valid.
+    const rotate = opts.rotateSecret === true;
     logger.step(
-      existing ? "Rotating project secret…" : "Reading project secret…"
+      rotate ? "Rotating project secret…" : "Reading project secret…"
     );
-    const projectSecret = await acquireProjectSecret(run, projectId, existing);
+    const projectSecret = await acquireProjectSecret(run, projectId, rotate);
     if (!projectSecret) {
+      const verb = rotate ? "rotate" : "read";
       return bail(
         opts.projectId
-          ? `Could not rotate the secret for project ${projectId}; check the id and your access with \`photon whoami\`.`
+          ? `Could not ${verb} the secret for project ${projectId}; check the id and your access with \`photon whoami\`.`
           : "Created the project but could not read its secret;"
       );
     }

@@ -278,12 +278,12 @@ function fillDefaults(partial: PartialOptions, manifest: Manifest) {
     projectId: partial.projectId,
     // Cloud setup normally needs an interactive login, so the unattended -y
     // path opts out — unless the user pinned a project with --projectId, in
-    // which case provisioning (mint secret → .env) is exactly what they asked
+    // which case provisioning (read secret → .env) is exactly what they asked
     // for. It still fails soft to a manual .env if auth can't complete.
     provisionCloud: partial.projectId !== undefined,
-    // -y is "do the whole thing unattended": when a project is pinned, that
-    // includes rotating its secret (the interactive caution prompt is skipped).
-    rotateSecret: partial.projectId === undefined ? undefined : true,
+    // -y never rotates: an existing project's secret is read as-is so nothing
+    // already in use gets invalidated. Rotation is an explicit interactive opt-in.
+    rotateSecret: false,
   } satisfies PartialOptions & {
     targetDir: string;
     providers: Provider[];

@@ -181,10 +181,10 @@ describe("provisionSpectrumProject", () => {
     ).toBeNull();
   });
 
-  test("existing projectId → skips create, rotates secret for that id", async () => {
+  test("existing projectId → skips create, reads (never rotates) that id's secret", async () => {
     const { runner, calls } = fakeRunner({
       whoami: [{ code: 0, stdout: "{}" }],
-      // Only the regenerate-secret call lands on `projects` now — no create.
+      // Only the read lands on `projects` now — no create.
       projects: [{ code: 0, stdout: '{"projectSecret":"spk_live_existing"}' }],
     });
 
@@ -201,18 +201,18 @@ describe("provisionSpectrumProject", () => {
     expect(calls.some((c) => c[0] === "projects" && c[1] === "create")).toBe(
       false
     );
-    // regenerate-secret targeted the supplied id.
+    // The read targeted the supplied id — and nothing rotated.
     expect(calls).toContainEqual([
       "projects",
-      "regenerate-secret",
-      "-y",
+      "secret",
       "--project",
       "proj_existing",
       "--json",
     ]);
+    expect(calls.some((c) => c.includes("regenerate-secret"))).toBe(false);
   });
 
-  test("existing projectId but secret mint fails → null, no create", async () => {
+  test("existing projectId but secret read fails → null, no create", async () => {
     const { runner, calls } = fakeRunner({
       whoami: [{ code: 0, stdout: "{}" }],
       projects: [{ code: 1, stdout: "" }],
@@ -229,9 +229,10 @@ describe("provisionSpectrumProject", () => {
     );
   });
 
-  test("existing projectId, rotateSecret false → pins id, leaves secret blank", async () => {
+  test("existing projectId, rotateSecret false → pins id, pulls existing secret", async () => {
     const { runner, calls } = fakeRunner({
       whoami: [{ code: 0, stdout: "{}" }],
+      projects: [{ code: 0, stdout: '{"projectSecret":"spk_live_keep"}' }],
     });
 
     const creds = await provisionSpectrumProject(
@@ -244,11 +245,20 @@ describe("provisionSpectrumProject", () => {
       { runner, logger: silent }
     );
 
-    // Project id is pinned for .env; secret left blank for the user to fill.
-    expect(creds).toEqual({ projectId: "proj_keep", projectSecret: "" });
-    // The existing secret stays valid — no regenerate-secret (or any
-    // `projects`) call is issued.
-    expect(calls.some((c) => c[0] === "projects")).toBe(false);
+    // Existing secret is pulled straight into .env — no manual fill needed.
+    expect(creds).toEqual({
+      projectId: "proj_keep",
+      projectSecret: "spk_live_keep",
+    });
+    // The existing secret stays valid — it's read, never rotated.
+    expect(calls).toContainEqual([
+      "projects",
+      "secret",
+      "--project",
+      "proj_keep",
+      "--json",
+    ]);
+    expect(calls.some((c) => c.includes("regenerate-secret"))).toBe(false);
   });
 
   test("existing projectId, rotateSecret true → rotates the secret", async () => {
