@@ -71,32 +71,21 @@ function spawnPhoton(
 }
 
 /**
- * Prefer a `photon` on PATH; otherwise run the published CLI through the
- * package runner (bun vs node picked the same way as scaffold's skills
- * installer).
+ * Always run the published CLI through the package runner, pinned to `@latest`,
+ * so every scaffold picks up the newest release instead of deferring to a
+ * possibly-stale `photon` already on PATH. Provisioning talks to Spectrum Cloud
+ * over the network on every call anyway, so the registry round-trip the runner
+ * makes to resolve `@latest` costs nothing in offline capability. (bun vs node
+ * is picked the same way as the scaffold's skills installer.)
  */
-async function resolveInvocation(): Promise<[string, ...string[]]> {
-  try {
-    const { code } = await spawnPhoton("photon", ["--version"], true);
-    if (code === 0) {
-      return ["photon"];
-    }
-  } catch {
-    // not on PATH — fall through to the package runner
-  }
+function cliInvocation(): [string, ...string[]] {
   const runner = typeof process.versions.bun === "string" ? "bunx" : "npx";
-  return [runner, "-y", "@photon-ai/cli"];
+  return [runner, "-y", "@photon-ai/cli@latest"];
 }
 
 function defaultRunner(): CliRunner {
-  let invocation: [string, ...string[]] | null = null;
-  return async (args, { capture }) => {
-    if (!invocation) {
-      invocation = await resolveInvocation();
-    }
-    const [cmd, ...prefix] = invocation;
-    return spawnPhoton(cmd, [...prefix, ...args], capture);
-  };
+  const [cmd, ...prefix] = cliInvocation();
+  return (args, { capture }) => spawnPhoton(cmd, [...prefix, ...args], capture);
 }
 
 async function isAuthed(run: CliRunner): Promise<boolean> {
@@ -123,9 +112,24 @@ function parseField(
 }
 
 /**
+ * Read a project's API secret (`projects secret`) so the one already in use
+ * stays valid. Returns null when the CLI surfaces no secret.
+ */
+async function readProjectSecret(
+  run: CliRunner,
+  projectId: string
+): Promise<string | null> {
+  const result = await run(
+    ["projects", "secret", "--project", projectId, "--json"],
+    { capture: true }
+  );
+  return parseField(result, "projectSecret");
+}
+
+/**
  * Set up a Spectrum Cloud project and return its credentials, ready to be
  * written into the scaffold's `.env`. Authenticates inline (running `photon
- * login` if needed), then mints the project secret.
+ * login` if needed), then obtains the project secret.
  *
  * When `opts.projectId` is supplied, the create step is skipped entirely: the
  * existing project is used as-is and `opts.platforms`/`opts.name` are ignored.
@@ -133,18 +137,15 @@ function parseField(
  * list for a project with no managed platform — e.g. a Slack/Telegram-only
  * scaffold that just needs the secret).
  *
- * `opts.rotateSecret` only applies to an existing `opts.projectId`. When it's
- * `false`, the secret is left untouched (rotating it would invalidate the one
- * already in use): PROJECT_ID is still pinned and the returned `projectSecret`
- * is empty so the user fills it in from the dashboard. A freshly created
- * project always mints, regardless of this flag.
+ * The secret is always *read* (`projects secret`), never rotated, so any secret
+ * already in use stays valid — `projects create` mints one server-side, and an
+ * existing project already has its own.
  */
 export async function provisionSpectrumProject(
   opts: {
     name: string;
     platforms: readonly string[];
     projectId?: string;
-    rotateSecret?: boolean;
   },
   deps: ProvisionDeps = {}
 ): Promise<SpectrumCredentials | null> {
@@ -154,16 +155,6 @@ export async function provisionSpectrumProject(
     logger.warn(`${msg} Fill in .env manually.`);
     return null;
   };
-
-  // Existing project + the user declined rotation: keep their secret valid
-  // and hand back a blank one to fill in manually. This path needs no cloud
-  // access, so resolve it before any auth/login work.
-  if (opts.projectId && opts.rotateSecret === false) {
-    logger.step(
-      "Keeping the existing secret — fill PROJECT_SECRET into .env yourself."
-    );
-    return { projectId: opts.projectId, projectSecret: "" };
-  }
 
   try {
     if (!(await isAuthed(run))) {
@@ -195,17 +186,13 @@ export async function provisionSpectrumProject(
       projectId = createdId;
     }
 
-    logger.step("Generating project secret…");
-    const rotated = await run(
-      ["projects", "regenerate-secret", "-y", "--project", projectId, "--json"],
-      { capture: true }
-    );
-    const projectSecret = parseField(rotated, "projectSecret");
+    logger.step("Reading project secret…");
+    const projectSecret = await readProjectSecret(run, projectId);
     if (!projectSecret) {
       return bail(
         opts.projectId
-          ? `Could not mint a secret for project ${projectId}; check the id and your access with \`photon whoami\`.`
-          : "Created the project but could not mint its secret;"
+          ? `Could not read the secret for project ${projectId}; check the id and your access with \`photon whoami\`.`
+          : "Created the project but could not read its secret;"
       );
     }
 

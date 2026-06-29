@@ -127,7 +127,6 @@ async function main(): Promise<number> {
           name: basename(resolve(opts.targetDir)),
           platforms: cloudPlatformsFor(opts.providers),
           projectId: opts.projectId,
-          rotateSecret: opts.rotateSecret,
         },
         {
           logger: {
@@ -171,8 +170,8 @@ async function main(): Promise<number> {
     `${SYM.ok} Created ${pc.cyan(basename(result.targetDir))} ${SYM.dot} ${pc.bold(`spectrum-ts ${result.spectrumTsVersion}`)} ${pc.dim(`(${seconds}s)`)}`
   );
 
-  // A blank secret (user declined rotation) still needs filling in, so treat
-  // credentials as "written" only when the secret is actually present.
+  // If provisioning soft-failed, the .env secret is blank and still needs
+  // filling in, so treat credentials as "written" only when it's present.
   const secretWritten =
     credentials !== undefined && credentials.projectSecret.length > 0;
   printNextSteps(result, opts, secretWritten);
@@ -278,17 +277,13 @@ function fillDefaults(partial: PartialOptions, manifest: Manifest) {
     projectId: partial.projectId,
     // Cloud setup normally needs an interactive login, so the unattended -y
     // path opts out — unless the user pinned a project with --projectId, in
-    // which case provisioning (mint secret → .env) is exactly what they asked
+    // which case provisioning (read secret → .env) is exactly what they asked
     // for. It still fails soft to a manual .env if auth can't complete.
     provisionCloud: partial.projectId !== undefined,
-    // -y is "do the whole thing unattended": when a project is pinned, that
-    // includes rotating its secret (the interactive caution prompt is skipped).
-    rotateSecret: partial.projectId === undefined ? undefined : true,
   } satisfies PartialOptions & {
     targetDir: string;
     providers: Provider[];
     provisionCloud: boolean;
-    rotateSecret: boolean | undefined;
   };
 }
 

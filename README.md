@@ -33,7 +33,7 @@ Usage: create-spectrum-project [directory] [options]
 Options:
   --platforms <list>   Comma-separated keys: terminal, imessage, telegram, whatsapp-business
                        (alias: --providers)
-  --projectId <id>     Use an existing Spectrum Cloud project (skip create, mint its
+  --projectId <id>     Use an existing Spectrum Cloud project (skip create, read its
                        secret into .env)
   --pm <m>             bun | npm | pnpm | yarn (default: detected)
   --no-install         Skip dependency install
@@ -67,7 +67,7 @@ bun create spectrum-project@latest my-app --platforms terminal
 bun create spectrum-project@latest my-app --platforms imessage,whatsapp-business --pm pnpm --no-git
 
 # Use an existing Spectrum Cloud project — no new project is created; its
-# secret is regenerated and written into the scaffold's .env
+# existing secret is read and written into the scaffold's .env
 bun create spectrum-project@latest my-app --projectId proj_abc123
 ```
 

@@ -18,11 +18,6 @@ export interface PartialOptions {
 export type PromptResult = ScaffoldOptions & {
   projectId?: string;
   provisionCloud: boolean;
-  /**
-   * For an existing `projectId`: whether to rotate (regenerate) its secret.
-   * `undefined` when no project was pinned (a fresh project always mints).
-   */
-  rotateSecret?: boolean;
 };
 
 const onCancel = () => {
@@ -51,10 +46,6 @@ export async function promptForOptions(
   const providers = partial.providers ?? (await askProviders(manifest));
 
   const provisionCloud = await askSetUpCloud(providers, partial);
-
-  // Pinning an existing project mints a fresh secret by rotating it, which
-  // invalidates the old one. Check before doing something destructive.
-  const rotateSecret = partial.projectId ? await askRotateSecret() : undefined;
 
   const detected = detectPm() ?? "bun";
   const pmChoices: PackageManager[] = ["bun", "npm", "pnpm", "yarn"];
@@ -128,27 +119,7 @@ export async function promptForOptions(
     skills,
     projectId: partial.projectId,
     provisionCloud,
-    rotateSecret,
   };
-}
-
-/**
- * Caution gate for `--projectId`: provisioning rotates (regenerates) the
- * project's API secret so it can write a working one into `.env`.
- */
-async function askRotateSecret(): Promise<boolean> {
-  const { value } = await prompts(
-    {
-      type: "confirm",
-      name: "value",
-      message:
-        "Heads up: this will rotate your project's secret and write it into " +
-        ".env. Say No to keep your current secret and fill it in yourself.",
-      initial: true,
-    },
-    { onCancel }
-  );
-  return value;
 }
 
 /**

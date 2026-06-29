@@ -27,7 +27,7 @@ function fakeRunner(
 const silent = silentLogger();
 
 describe("provisionSpectrumProject", () => {
-  test("already authed → creates project and mints secret", async () => {
+  test("already authed → creates project and reads secret", async () => {
     const { runner, calls } = fakeRunner({
       whoami: [{ code: 0, stdout: '{"email":"a@b.c"}' }],
       projects: [
@@ -57,6 +57,16 @@ describe("provisionSpectrumProject", () => {
       "imessage",
       "--json",
     ]);
+    // The secret is read, never rotated — `regenerate-secret` would break any
+    // live integration using the existing secret.
+    expect(calls).toContainEqual([
+      "projects",
+      "secret",
+      "--project",
+      "proj_123",
+      "--json",
+    ]);
+    expect(calls.some((c) => c.includes("regenerate-secret"))).toBe(false);
   });
 
   test("multiple platforms → comma-joined --platforms", async () => {
@@ -143,7 +153,7 @@ describe("provisionSpectrumProject", () => {
     ).toBeNull();
   });
 
-  test("project create fails → null, no secret rotation", async () => {
+  test("project create fails → null, no secret read", async () => {
     const { runner, calls } = fakeRunner({
       whoami: [{ code: 0, stdout: "{}" }],
       projects: [{ code: 1, stdout: "" }],
@@ -154,7 +164,7 @@ describe("provisionSpectrumProject", () => {
         { runner, logger: silent }
       )
     ).toBeNull();
-    // create attempted once; regenerate-secret never reached.
+    // create attempted once; the secret read never reached.
     expect(calls.filter((c) => c[0] === "projects")).toHaveLength(1);
   });
 
@@ -171,10 +181,10 @@ describe("provisionSpectrumProject", () => {
     ).toBeNull();
   });
 
-  test("existing projectId → skips create, mints secret for that id", async () => {
+  test("existing projectId → skips create, reads (never rotates) that id's secret", async () => {
     const { runner, calls } = fakeRunner({
       whoami: [{ code: 0, stdout: "{}" }],
-      // Only the regenerate-secret call lands on `projects` now — no create.
+      // Only the read lands on `projects` now — no create.
       projects: [{ code: 0, stdout: '{"projectSecret":"spk_live_existing"}' }],
     });
 
@@ -191,18 +201,18 @@ describe("provisionSpectrumProject", () => {
     expect(calls.some((c) => c[0] === "projects" && c[1] === "create")).toBe(
       false
     );
-    // regenerate-secret targeted the supplied id.
+    // The read targeted the supplied id — and nothing rotated.
     expect(calls).toContainEqual([
       "projects",
-      "regenerate-secret",
-      "-y",
+      "secret",
       "--project",
       "proj_existing",
       "--json",
     ]);
+    expect(calls.some((c) => c.includes("regenerate-secret"))).toBe(false);
   });
 
-  test("existing projectId but secret mint fails → null, no create", async () => {
+  test("existing projectId but secret read fails → null, no create", async () => {
     const { runner, calls } = fakeRunner({
       whoami: [{ code: 0, stdout: "{}" }],
       projects: [{ code: 1, stdout: "" }],
@@ -219,9 +229,10 @@ describe("provisionSpectrumProject", () => {
     );
   });
 
-  test("existing projectId, rotateSecret false → pins id, leaves secret blank", async () => {
+  test("existing projectId → pins id, pulls existing secret", async () => {
     const { runner, calls } = fakeRunner({
       whoami: [{ code: 0, stdout: "{}" }],
+      projects: [{ code: 0, stdout: '{"projectSecret":"spk_live_keep"}' }],
     });
 
     const creds = await provisionSpectrumProject(
@@ -229,76 +240,27 @@ describe("provisionSpectrumProject", () => {
         name: "app",
         platforms: ["imessage"],
         projectId: "proj_keep",
-        rotateSecret: false,
       },
       { runner, logger: silent }
     );
 
-    // Project id is pinned for .env; secret left blank for the user to fill.
-    expect(creds).toEqual({ projectId: "proj_keep", projectSecret: "" });
-    // The existing secret stays valid — no regenerate-secret (or any
-    // `projects`) call is issued.
-    expect(calls.some((c) => c[0] === "projects")).toBe(false);
-  });
-
-  test("existing projectId, rotateSecret true → rotates the secret", async () => {
-    const { runner, calls } = fakeRunner({
-      whoami: [{ code: 0, stdout: "{}" }],
-      projects: [{ code: 0, stdout: '{"projectSecret":"spk_live_rot"}' }],
-    });
-
-    const creds = await provisionSpectrumProject(
-      {
-        name: "app",
-        platforms: ["imessage"],
-        projectId: "proj_rot",
-        rotateSecret: true,
-      },
-      { runner, logger: silent }
-    );
-
+    // Existing secret is pulled straight into .env — no manual fill needed.
     expect(creds).toEqual({
-      projectId: "proj_rot",
-      projectSecret: "spk_live_rot",
+      projectId: "proj_keep",
+      projectSecret: "spk_live_keep",
     });
+    // The existing secret stays valid — it's read, never rotated.
     expect(calls).toContainEqual([
       "projects",
-      "regenerate-secret",
-      "-y",
+      "secret",
       "--project",
-      "proj_rot",
+      "proj_keep",
       "--json",
     ]);
+    expect(calls.some((c) => c.includes("regenerate-secret"))).toBe(false);
   });
 
-  test("new project ignores rotateSecret false — a fresh project must mint", async () => {
-    const { runner, calls } = fakeRunner({
-      whoami: [{ code: 0, stdout: "{}" }],
-      projects: [
-        { code: 0, stdout: '{"id":"proj_new"}' },
-        { code: 0, stdout: '{"projectSecret":"spk_live_new"}' },
-      ],
-    });
-
-    const creds = await provisionSpectrumProject(
-      { name: "app", platforms: ["imessage"], rotateSecret: false },
-      { runner, logger: silent }
-    );
-
-    expect(creds).toEqual({
-      projectId: "proj_new",
-      projectSecret: "spk_live_new",
-    });
-    // rotateSecret only governs existing projects; a created one still mints.
-    expect(calls.some((c) => c[0] === "projects" && c[1] === "create")).toBe(
-      true
-    );
-    expect(
-      calls.some((c) => c[0] === "projects" && c[1] === "regenerate-secret")
-    ).toBe(true);
-  });
-
-  test("secret rotation returns no secret → null", async () => {
+  test("secret read returns no secret → null", async () => {
     const { runner } = fakeRunner({
       whoami: [{ code: 0, stdout: "{}" }],
       projects: [
